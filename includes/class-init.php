@@ -54,15 +54,7 @@ class Init {
 	 */
 	public function forntend_scripts_callback() {
 		wp_enqueue_style( 'prta-frontend-style', PRTA_URL . 'assets/css/frontend.css', array(), PRTA_VER );
-		// wp_enqueue_script( 'prta-frontend-script', PRTA_URL . 'assets/js/frontend.js', array( 'jquery' ), PRTA_VER, true );
-		wp_localize_script(
-			'prta-frontend-script',
-			'prta_frontend',
-			array(
-				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'prta-frontend-nonce' ),
-			)
-		);
+		wp_enqueue_script( 'prta-frontend-script', PRTA_URL . 'assets/js/frontend.js', array(), PRTA_VER, true );
 	}
 
 	/**

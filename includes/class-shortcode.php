@@ -160,9 +160,11 @@ class Shortcode {
 		$key      = $prefix . 'filter_' . sanitize_key( str_replace( ':', '_', $value ) );
 		$selected = isset( $get[ $key ] ) ? sanitize_title( $get[ $key ] ) : '';
 		if ( $taxonomy && taxonomy_exists( $taxonomy ) ) {
-			printf( '<label><span class="screen-reader-text">%1$s</span><select name="%2$s" aria-label="%1$s" onchange="this.form.submit()"><option value="">%1$s</option>%3$s</select></label>', esc_html( $filter['label'] ), esc_attr( $key ), $this->get_term_options( $taxonomy, $selected ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			printf( '<label class="prta-field"><span class="prta-field-label">%1$s</span><select name="%2$s"><option value="">%1$s</option>%3$s</select></label>', esc_html( $filter['label'] ), esc_attr( $key ), $this->get_term_options( $taxonomy, $selected ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		} elseif ( 'author' === $value ) {
-			wp_dropdown_users( array( 'name' => $key, 'selected' => absint( $selected ), 'show_option_all' => __( 'All Authors', 'table-for-woocommerce' ), 'echo' => true ) );
+			echo '<label class="prta-field"><span class="prta-field-label">' . esc_html( $filter['label'] ) . '</span>';
+			wp_dropdown_users( array( 'name' => $key, 'id' => wp_unique_id( $key . '-' ), 'selected' => absint( $selected ), 'show_option_all' => __( 'All Authors', 'table-for-woocommerce' ), 'echo' => true ) );
+			echo '</label>';
 		}
 	}
 
@@ -196,7 +198,7 @@ class Shortcode {
 			case 'tax:pa_color': return esc_html( $product->get_attribute( 'pa_color' ) );
 			case 'tax:pa_size': return esc_html( $product->get_attribute( 'pa_size' ) );
 			case 'author': return esc_html( get_the_author_meta( 'display_name', get_post_field( 'post_author', $id ) ) );
-			case 'button': return '<a class="button" href="' . esc_url( $product->get_permalink() ) . '">' . esc_html( $product->add_to_cart_text() ) . '</a>';
+			case 'button': return '<a class="prta-button prta-button-secondary" href="' . esc_url( $product->get_permalink() ) . '">' . esc_html( $product->add_to_cart_text() ) . '</a>';
 			case 'buy': return $this->get_buy_control( $product, $settings );
 		}
 		return '';
@@ -211,11 +213,11 @@ class Shortcode {
 	 */
 	private function get_buy_control( $product, $settings ) {
 		if ( ! $product->is_type( 'simple' ) || ! $product->is_purchasable() || ! $product->is_in_stock() ) {
-			return '<a class="button" href="' . esc_url( $product->get_permalink() ) . '">' . esc_html( $product->add_to_cart_text() ) . '</a>';
+			return '<a class="prta-button prta-button-secondary" href="' . esc_url( $product->get_permalink() ) . '">' . esc_html( $product->add_to_cart_text() ) . '</a>';
 		}
 		$id       = $product->get_id();
-		$quantity = ! empty( $settings['quantitySelector'] ) ? '<input class="prta-qty" aria-label="' . esc_attr__( 'Quantity', 'table-for-woocommerce' ) . '" type="number" name="prta_quantity[' . esc_attr( $id ) . ']" value="1" min="1" step="1">' : '';
-		return $quantity . '<button type="submit" class="prta-cart" name="prta_add_product" value="' . esc_attr( $id ) . '">' . esc_html__( 'Add to cart', 'table-for-woocommerce' ) . '</button><input class="prta-checkbox" aria-label="' . esc_attr( sprintf( __( 'Select %s', 'table-for-woocommerce' ), $product->get_name() ) ) . '" name="prta_products[]" value="' . esc_attr( $id ) . '" type="checkbox">';
+		$quantity = ! empty( $settings['quantitySelector'] ) && ! $product->is_sold_individually() ? '<input class="prta-qty" aria-label="' . esc_attr( sprintf( __( 'Quantity for %s', 'table-for-woocommerce' ), $product->get_name() ) ) . '" type="number" name="prta_quantity[' . esc_attr( $id ) . ']" value="1" min="1" step="1">' : '';
+		return '<div class="prta-buy-controls">' . $quantity . '<button type="submit" class="prta-button prta-cart" aria-label="' . esc_attr( sprintf( __( 'Add %s to cart', 'table-for-woocommerce' ), $product->get_name() ) ) . '" name="prta_add_product" value="' . esc_attr( $id ) . '">' . esc_html__( 'Add to cart', 'table-for-woocommerce' ) . '</button><input class="prta-checkbox" aria-label="' . esc_attr( sprintf( __( 'Select %s', 'table-for-woocommerce' ), $product->get_name() ) ) . '" name="prta_products[]" value="' . esc_attr( $id ) . '" type="checkbox"></div>';
 	}
 
 	/**
@@ -253,7 +255,7 @@ class Shortcode {
 			$key = $prefix . 'filter_' . sanitize_key( str_replace( ':', '_', $value ) );
 			$selected = isset( $get[ $key ] ) ? sanitize_title( $get[ $key ] ) : '';
 			if ( ! $selected ) continue;
-			if ( 'author' === $value ) { $author = absint( $selected ); continue; }
+			if ( 'author' === $value ) { $author = absint( $selected ); $active_filter_keys[] = $key; continue; }
 			$taxonomy = 0 === strpos( $value, 'tax:' ) ? substr( $value, 4 ) : array_search( $value, array( 'product_cat' => 'categories', 'product_tag' => 'tags' ), true );
 			$taxonomy = $taxonomy ? $taxonomy : $value;
 			if ( taxonomy_exists( $taxonomy ) ) {
@@ -271,35 +273,40 @@ class Shortcode {
 		remove_filter( 'woocommerce_product_data_store_cpt_get_products_query', $query_filter );
 		$products = $results->products;
 		$current_url = remove_query_arg( $prefix . 'page' );
-		$reset_url  = remove_query_arg( array_merge( $active_filter_keys, array( $prefix . 'page' ) ) );
-		$cart_button = '<button type="submit" class="button" name="prta_add_selected" value="1">' . esc_html__( 'Add selected to cart', 'table-for-woocommerce' ) . '</button>';
+		$reset_url  = remove_query_arg( array_merge( $active_filter_keys, array( $prefix . 'page', $prefix . 'search' ) ) );
+		$cart_button = '<button type="submit" class="prta-button prta-bulk-submit" name="prta_add_selected" value="1">' . esc_html__( 'Add selected to cart', 'table-for-woocommerce' ) . '</button>';
+		$instance_id = wp_unique_id( 'prta-' . $table_id . '-' );
+		$has_buy = in_array( 'buy', array_column( $settings['columns'], 'value' ), true );
+		$selection_status = '<span class="prta-selection-status" aria-live="polite" aria-atomic="true" data-template="' . esc_attr__( '%s selected', 'table-for-woocommerce' ) . '"></span>';
 		ob_start();
 		?>
-		<div class="prta-wrapper" id="<?php echo esc_attr( 'prta-' . $table_id ); ?>">
+		<div class="prta-wrapper" id="<?php echo esc_attr( $instance_id ); ?>">
 			<form class="prta-filters" method="get">
 				<?php foreach ( $get as $key => $value ) if ( 0 !== strpos( (string) $key, $prefix ) && is_scalar( $value ) ) printf( '<input type="hidden" name="%s" value="%s">', esc_attr( $key ), esc_attr( $value ) ); ?>
 				<?php foreach ( $settings['searchFilters'] as $filter ) $this->render_filter( $filter, $prefix, $get ); ?>
-				<?php if ( $active_filter_keys ) : ?><a class="button prta-reset-filters" href="<?php echo esc_url( $reset_url ); ?>"><?php esc_html_e( 'Reset', 'table-for-woocommerce' ); ?></a><?php endif; ?>
-				<label class="prta-search"><span class="screen-reader-text"><?php esc_html_e( 'Search products', 'table-for-woocommerce' ); ?></span><input type="search" name="<?php echo esc_attr( $prefix . 'search' ); ?>" value="<?php echo esc_attr( $search ); ?>" placeholder="<?php esc_attr_e( 'Search products…', 'table-for-woocommerce' ); ?>"></label>
-				<button type="submit"><?php esc_html_e( 'Filter', 'table-for-woocommerce' ); ?></button>
+				<label class="prta-field prta-search"><span class="prta-field-label"><?php esc_html_e( 'Search products', 'table-for-woocommerce' ); ?></span><input type="search" name="<?php echo esc_attr( $prefix . 'search' ); ?>" value="<?php echo esc_attr( $search ); ?>" placeholder="<?php esc_attr_e( 'Search products…', 'table-for-woocommerce' ); ?>"></label>
+				<input type="hidden" name="<?php echo esc_attr( $prefix . 'limit' ); ?>" value="<?php echo esc_attr( $limit ); ?>">
+				<button class="prta-button prta-button-secondary prta-icon-button" type="submit" aria-label="<?php esc_attr_e( 'Search products', 'table-for-woocommerce' ); ?>" title="<?php esc_attr_e( 'Search products', 'table-for-woocommerce' ); ?>"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>
+				<?php if ( $active_filter_keys || '' !== $search ) : ?><a class="prta-button prta-button-secondary prta-icon-button prta-reset-filters" href="<?php echo esc_url( $reset_url ); ?>" aria-label="<?php esc_attr_e( 'Clear filters and search', 'table-for-woocommerce' ); ?>" title="<?php esc_attr_e( 'Clear filters and search', 'table-for-woocommerce' ); ?>"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg></a><?php endif; ?>
 			</form>
 			<form method="post" class="prta-cart-form">
 				<?php wp_nonce_field( 'prta_add_to_cart', 'prta_cart_nonce' ); ?>
 				<input type="hidden" name="prta_cart_action" value="add"><input type="hidden" name="prta_return_url" value="<?php echo esc_url( $current_url ); ?>">
-				<?php if ( in_array( $settings['cartLocation'], array( 'above', 'all' ), true ) ) : ?><div class="prta-bulk-actions"><?php echo $cart_button; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div><?php endif; ?>
-				<div class="prta-table-scroll"><table class="prta-table"><thead><tr>
-				<?php foreach ( $settings['columns'] as $column ) : ?><th><?php if ( 'buy' === $column['value'] && ! empty( $settings['selectAll'] ) ) : ?><input type="checkbox" onclick="this.closest('table').querySelectorAll('.prta-checkbox').forEach((item)=>item.checked=this.checked)" aria-label="<?php esc_attr_e( 'Select all products', 'table-for-woocommerce' ); ?>"> <?php endif; ?><?php echo esc_html( $column['label'] ); ?></th><?php endforeach; ?>
+				<?php if ( $has_buy && $products && in_array( $settings['cartLocation'], array( 'above', 'all' ), true ) ) : ?><div class="prta-bulk-actions"><?php echo $cart_button . $selection_status; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div><?php endif; ?>
+				<p class="prta-scroll-hint" id="<?php echo esc_attr( $instance_id . '-hint' ); ?>"><?php esc_html_e( 'Swipe or scroll horizontally to see all product details.', 'table-for-woocommerce' ); ?></p>
+				<div class="prta-table-scroll" role="region" tabindex="0" aria-label="<?php esc_attr_e( 'Product table', 'table-for-woocommerce' ); ?>" aria-describedby="<?php echo esc_attr( $instance_id . '-hint' ); ?>"><table class="prta-table"><caption class="prta-sr-only"><?php esc_html_e( 'Products and purchase options', 'table-for-woocommerce' ); ?></caption><thead><tr>
+				<?php foreach ( $settings['columns'] as $column ) : ?><th scope="col"><?php if ( 'buy' === $column['value'] && ! empty( $settings['selectAll'] ) ) : ?><input type="checkbox" class="prta-select-all" hidden aria-label="<?php esc_attr_e( 'Select all products', 'table-for-woocommerce' ); ?>"> <?php endif; ?><?php echo esc_html( $column['label'] ); ?></th><?php endforeach; ?>
 				</tr></thead><tbody>
 				<?php if ( $products ) : foreach ( $products as $product ) : ?><tr>
 					<?php foreach ( $settings['columns'] as $column ) : ?><td class="<?php echo esc_attr( 'prta-column-' . sanitize_html_class( $column['value'] ) ); ?>"><?php echo $this->get_cell( $column['value'], $product, $settings ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
-				</tr><?php endforeach; else : ?><tr><td colspan="<?php echo esc_attr( count( $settings['columns'] ) ); ?>"><?php esc_html_e( 'No products found.', 'table-for-woocommerce' ); ?></td></tr><?php endif; ?>
+				</tr><?php endforeach; else : ?><tr><td class="prta-empty" colspan="<?php echo esc_attr( count( $settings['columns'] ) ); ?>"><strong><?php esc_html_e( 'No products found', 'table-for-woocommerce' ); ?></strong><span><?php esc_html_e( 'Try another search or reset your filters.', 'table-for-woocommerce' ); ?></span></td></tr><?php endif; ?>
 				</tbody></table></div>
-				<?php if ( in_array( $settings['cartLocation'], array( 'below', 'all' ), true ) ) : ?><div class="prta-bulk-actions"><?php echo $cart_button; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div><?php endif; ?>
+				<?php if ( $has_buy && $products && in_array( $settings['cartLocation'], array( 'below', 'all' ), true ) ) : ?><div class="prta-bulk-actions"><?php echo $cart_button . $selection_status; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div><?php endif; ?>
 			</form>
 			<div class="prta-pagination"><form method="get">
 				<?php foreach ( $get as $key => $value ) if ( $key !== $prefix . 'limit' && $key !== $prefix . 'page' && is_scalar( $value ) ) printf( '<input type="hidden" name="%s" value="%s">', esc_attr( $key ), esc_attr( $value ) ); ?>
-				<label><?php esc_html_e( 'Products per page', 'table-for-woocommerce' ); ?> <select name="<?php echo esc_attr( $prefix . 'limit' ); ?>" onchange="this.form.submit()"><?php foreach ( array_unique( array( $settings['productsPerPage'], 10, 25, 50, 100 ) ) as $size ) : ?><option value="<?php echo esc_attr( $size ); ?>" <?php selected( $limit, $size ); ?>><?php echo esc_html( $size ); ?></option><?php endforeach; ?></select></label>
-			</form><div class="prta-pages-info"><?php echo esc_html( sprintf( _n( '%s item', '%s items', $results->total, 'table-for-woocommerce' ), number_format_i18n( $results->total ) ) ); ?> <?php if ( $results->max_num_pages > 1 ) echo wp_kses_post( paginate_links( array( 'base' => esc_url_raw( add_query_arg( $prefix . 'page', '%#%', $current_url ) ), 'current' => $page, 'total' => $results->max_num_pages, 'type' => 'list' ) ) ); ?></div></div>
+				<label><span class="prta-sr-only"><?php esc_html_e( 'Products per page', 'table-for-woocommerce' ); ?></span><select name="<?php echo esc_attr( $prefix . 'limit' ); ?>"><?php foreach ( array_unique( array( $limit, $settings['productsPerPage'], 10, 25, 50, 100 ) ) as $size ) : ?><option value="<?php echo esc_attr( $size ); ?>" <?php selected( $limit, $size ); ?>><?php echo esc_html( $size ); ?></option><?php endforeach; ?></select></label>
+			</form><div class="prta-pages-info"><?php echo esc_html( sprintf( _n( '%s item', '%s items', $results->total, 'table-for-woocommerce' ), number_format_i18n( $results->total ) ) ); ?> <nav aria-label="<?php esc_attr_e( 'Product table pages', 'table-for-woocommerce' ); ?>"><?php if ( $results->max_num_pages > 1 ) echo wp_kses_post( paginate_links( array( 'base' => esc_url_raw( add_query_arg( $prefix . 'page', '%#%', $current_url ) ), 'current' => $page, 'total' => $results->max_num_pages, 'type' => 'list', 'prev_text' => __( 'Previous', 'table-for-woocommerce' ), 'next_text' => __( 'Next', 'table-for-woocommerce' ) ) ) ); ?></nav></div></div>
 		</div>
 		<?php
 		return ob_get_clean();
