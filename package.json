@@ -1,0 +1,28 @@
+{
+	"name": "table-for-woocommerce",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Gutenberg product table block for WooCommerce",
+	"main": "src/index.js",
+	"prettier": "@wordpress/prettier-config",
+	"scripts": {
+		"dev": "npm run watch",
+		"build": "esbuild src/index.js --bundle --outfile=assets/js/backend.js --minify --sourcemap --loader:.js=jsx --loader:.jsx=jsx",
+		"watch": "esbuild src/index.js --bundle --outfile=assets/js/backend.js --sourcemap --watch --loader:.js=jsx --loader:.jsx=jsx"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.26.0",
+		"@babel/eslint-parser": "^7.26.5",
+		"@babel/preset-react": "^7.26.3",
+		"@wordpress/components": "^30.8.0",
+		"@wordpress/eslint-plugin": "^22.0.0",
+		"@wordpress/prettier-config": "^4.16.0",
+		"esbuild": "^0.18.20",
+		"eslint": "^8.56.0",
+		"eslint-plugin-react": "^7.37.4",
+		"prettier": "npm:wp-prettier@^3.0.3",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"typescript": "^5.7.2"
+	}
+}
