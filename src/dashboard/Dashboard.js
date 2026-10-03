@@ -1,4 +1,4 @@
-const { __ } = wp.i18n;
+const { __, sprintf } = wp.i18n;
 import { useEffect, useState } from 'react';
 import Pagination from './Pagination';
 import {
@@ -9,6 +9,7 @@ import {
 	CheckboxControl,
 	ClipboardButton,
 	DropdownMenu,
+	Modal,
 	Notice,
 	SearchControl,
 	SelectControl,
@@ -44,6 +45,13 @@ const Dashboard = ( { onEdit } ) => {
 	const [ loading, setLoading ] = useState( true );
 	const [ error, setError ] = useState( '' );
 	const [ hasCopied, setHasCopied ] = useState( null );
+	const [ copyingId, setCopyingId ] = useState( null );
+	const [ pendingDelete, setPendingDelete ] = useState( [] );
+	const [ deleting, setDeleting ] = useState( false );
+	const pendingTable =
+		pendingDelete.length === 1
+			? tables.find( ( table ) => table.id === pendingDelete[ 0 ] )
+			: null;
 
 	const loadTables = async () => {
 		setLoading( true );
@@ -86,17 +94,37 @@ const Dashboard = ( { onEdit } ) => {
 			setError( requestError.message );
 		}
 	};
-	const deleteTables = async ( ids ) => {
-		if (
-			! ids.length ||
-			! window.confirm(
-				__( 'Delete the selected table(s)?', 'table-for-woocommerce' )
-			)
-		)
-			return;
+	const copyTable = async ( table ) => {
+		setCopyingId( table.id );
+		setError( '' );
+		try {
+			const title = `${
+				table.title?.raw || getSettings( table ).tableName || ''
+			} Copy`;
+			const settings = { ...getSettings( table ), tableName: title };
+			await wp.apiFetch( {
+				path: API_PATH,
+				method: 'POST',
+				data: {
+					title,
+					content: JSON.stringify( settings ),
+					status: 'draft',
+				},
+			} );
+			setPage( 1 );
+			if ( page === 1 ) loadTables();
+		} catch ( requestError ) {
+			setError( requestError.message );
+		} finally {
+			setCopyingId( null );
+		}
+	};
+	const deleteTables = async () => {
+		if ( ! pendingDelete.length ) return;
+		setDeleting( true );
 		try {
 			await Promise.all(
-				ids.map( ( id ) =>
+				pendingDelete.map( ( id ) =>
 					wp.apiFetch( {
 						path: `${ API_PATH }/${ id }?force=true`,
 						method: 'DELETE',
@@ -104,13 +132,16 @@ const Dashboard = ( { onEdit } ) => {
 				)
 			);
 			setSelected( [] );
+			setPendingDelete( [] );
 			loadTables();
 		} catch ( requestError ) {
 			setError( requestError.message );
+		} finally {
+			setDeleting( false );
 		}
 	};
 	const applyBulk = async () => {
-		if ( bulkAction === 'delete' ) return deleteTables( selected );
+		if ( bulkAction === 'delete' ) return setPendingDelete( selected );
 		if (
 			! selected.length ||
 			! [ 'enable', 'disable' ].includes( bulkAction )
@@ -137,329 +168,419 @@ const Dashboard = ( { onEdit } ) => {
 	};
 
 	return (
-		<Card style={ { marginTop: '20px' } }>
-			<CardHeader>
-				<VStack style={ { width: '100%' } } spacing={ 3 }>
-					<HStack alignment="edge">
-						<Heading level={ 3 }>
-							{ __( 'Table List', 'table-for-woocommerce' ) }
-						</Heading>
-						<Button
-							icon="plus-alt2"
-							variant="primary"
-							onClick={ () => onEdit( null ) }
-						>
-							{ __( 'Add New Table', 'table-for-woocommerce' ) }
-						</Button>
-					</HStack>
-					<Divider />
-					<HStack alignment="edge" spacing={ 3 }>
-						<HStack alignment="left" spacing={ 2 }>
-							<SelectControl
-								__next40pxDefaultSize
-								__nextHasNoMarginBottom
-								value={ bulkAction }
-								options={ [
-									{
-										label: __(
-											'Bulk Actions',
-											'table-for-woocommerce'
-										),
-										value: '',
-									},
-									{
-										label: __(
-											'Delete',
-											'table-for-woocommerce'
-										),
-										value: 'delete',
-									},
-									{
-										label: __(
-											'Enable',
-											'table-for-woocommerce'
-										),
-										value: 'enable',
-									},
-									{
-										label: __(
-											'Disable',
-											'table-for-woocommerce'
-										),
-										value: 'disable',
-									},
-								] }
-								onChange={ setBulkAction }
-							/>
+		<>
+			<Card style={ { marginTop: '20px' } }>
+				<CardHeader>
+					<VStack style={ { width: '100%' } } spacing={ 3 }>
+						<HStack alignment="edge">
+							<Heading level={ 3 }>
+								{ __( 'Table List', 'table-for-woocommerce' ) }
+							</Heading>
 							<Button
-								__next40pxDefaultSize
+								icon="plus-alt2"
 								variant="primary"
-								disabled={ ! bulkAction || ! selected.length }
-								onClick={ applyBulk }
+								onClick={ () => onEdit( null ) }
 							>
-								{ __( 'Apply', 'table-for-woocommerce' ) }
+								{ __(
+									'Add New Table',
+									'table-for-woocommerce'
+								) }
 							</Button>
 						</HStack>
-						<SearchControl
-							__nextHasNoMarginBottom
-							value={ search }
-							placeholder={ __(
-								'Search…',
-								'table-for-woocommerce'
-							) }
-							onChange={ ( value ) => {
-								setPage( 1 );
-								setSearch( value );
-							} }
-						/>
-					</HStack>
-				</VStack>
-			</CardHeader>
-			<CardBody>
-				{ error && (
-					<Notice
-						status="error"
-						isDismissible
-						onRemove={ () => setError( '' ) }
-					>
-						{ error }
-					</Notice>
-				) }
-				{ loading ? (
-					<Spinner />
-				) : (
-					<>
-						<HStack justify="space-between" gap={ 4 } wrap>
-							<CheckboxControl
+						<Divider />
+						<HStack alignment="edge" spacing={ 3 }>
+							<HStack alignment="left" spacing={ 2 }>
+								<SelectControl
+									__next40pxDefaultSize
+									__nextHasNoMarginBottom
+									value={ bulkAction }
+									options={ [
+										{
+											label: __(
+												'- Actions -',
+												'table-for-woocommerce'
+											),
+											value: '',
+										},
+										{
+											label: __(
+												'Delete',
+												'table-for-woocommerce'
+											),
+											value: 'delete',
+										},
+										{
+											label: __(
+												'Enable',
+												'table-for-woocommerce'
+											),
+											value: 'enable',
+										},
+										{
+											label: __(
+												'Disable',
+												'table-for-woocommerce'
+											),
+											value: 'disable',
+										},
+									] }
+									onChange={ setBulkAction }
+								/>
+								<Button
+									__next40pxDefaultSize
+									variant="primary"
+									disabled={
+										! bulkAction || ! selected.length
+									}
+									onClick={ applyBulk }
+								>
+									{ __( 'Apply', 'table-for-woocommerce' ) }
+								</Button>
+							</HStack>
+							<SearchControl
 								__nextHasNoMarginBottom
-								checked={
-									tables.length > 0 &&
-									selected.length === tables.length
-								}
-								onChange={ ( checked ) =>
-									setSelected(
-										checked
-											? tables.map(
-													( table ) => table.id
-											  )
-											: []
-									)
-								}
-							/>
-							<Text
-								weight={ 500 }
-								style={ { flex: 1, maxWidth: '80px' } }
-							>
-								#{ __( 'ID', 'table-for-woocommerce' ) }
-							</Text>
-							<Text weight={ 500 } style={ { flex: 1 } }>
-								{ __( 'Table Name', 'table-for-woocommerce' ) }
-							</Text>
-							<Text
-								weight={ 500 }
-								style={ { flex: 1, maxWidth: '100px' } }
-							>
-								{ __( 'Status', 'table-for-woocommerce' ) }
-							</Text>
-							<Text weight={ 500 } style={ { flex: 1 } }>
-								{ __( 'Display In', 'table-for-woocommerce' ) }
-							</Text>
-							<Text
-								weight={ 500 }
-								style={ { flex: 1, maxWidth: '200px' } }
-							>
-								{ __( 'Shortcode', 'table-for-woocommerce' ) }
-							</Text>
-							<Text
-								weight={ 500 }
-								style={ {
-									flex: 1,
-									textAlign: 'right',
-									maxWidth: '80px',
+								value={ search }
+								placeholder={ __(
+									'Search…',
+									'table-for-woocommerce'
+								) }
+								onChange={ ( value ) => {
+									setPage( 1 );
+									setSearch( value );
 								} }
-							>
-								{ __( 'Action', 'table-for-woocommerce' ) }
-							</Text>
+							/>
 						</HStack>
-						{ ! tables.length && (
-							<>
-								<Divider margin="5" />
-								<Text>
-									{ __(
-										'No tables found.',
-										'table-for-woocommerce'
-									) }
-								</Text>
-							</>
-						) }
-						{ tables.map( ( table ) => {
-							const settings = getSettings( table );
-							const shortcode = `[product_table id="${ table.id }"]`;
-							return (
-								<div key={ table.id }>
-									<Divider margin="5" />
-									<HStack
-										justify="space-between"
-										gap={ 4 }
-										wrap
-									>
+					</VStack>
+				</CardHeader>
+				<CardBody>
+					{ error && (
+						<Notice
+							status="error"
+							isDismissible
+							onRemove={ () => setError( '' ) }
+						>
+							{ error }
+						</Notice>
+					) }
+					{ loading ? (
+						<Spinner />
+					) : (
+						<>
+							<div className="prta-dashboard-table-scroll">
+								<div className="prta-dashboard-table">
+									<div className="prta-dashboard-row prta-dashboard-head">
 										<CheckboxControl
 											__nextHasNoMarginBottom
-											checked={ selected.includes(
-												table.id
-											) }
+											checked={
+												tables.length > 0 &&
+												selected.length ===
+													tables.length
+											}
 											onChange={ ( checked ) =>
 												setSelected(
 													checked
-														? [
-																...selected,
-																table.id,
-														  ]
-														: selected.filter(
-																( id ) =>
-																	id !==
+														? tables.map(
+																( table ) =>
 																	table.id
 														  )
+														: []
 												)
 											}
 										/>
-										<Button
-											style={ {
-												flex: 1,
-												maxWidth: '80px',
-											} }
-											variant="link"
-											onClick={ () => onEdit( table.id ) }
+										<Text weight={ 500 }>
+											#
+											{ __(
+												'ID',
+												'table-for-woocommerce'
+											) }
+										</Text>
+										<Text weight={ 500 }>
+											{ __(
+												'Table Name',
+												'table-for-woocommerce'
+											) }
+										</Text>
+										<Text weight={ 500 }>
+											{ __(
+												'Status',
+												'table-for-woocommerce'
+											) }
+										</Text>
+										<Text weight={ 500 }>
+											{ __(
+												'Display In',
+												'table-for-woocommerce'
+											) }
+										</Text>
+										<Text weight={ 500 }>
+											{ __(
+												'Shortcode',
+												'table-for-woocommerce'
+											) }
+										</Text>
+										<Text
+											className="prta-dashboard-action"
+											weight={ 500 }
 										>
-											#{ table.id }
-										</Button>
-										<Button
-											style={ { flex: 1 } }
-											variant="link"
-											onClick={ () => onEdit( table.id ) }
-										>
-											{ table.title?.rendered ||
-												__(
-													'(no title)',
+											{ __(
+												'Action',
+												'table-for-woocommerce'
+											) }
+										</Text>
+									</div>
+									{ ! tables.length && (
+										<>
+											<Text>
+												{ __(
+													'No tables found.',
 													'table-for-woocommerce'
 												) }
-										</Button>
-										<span
-											style={ {
-												flex: 1,
-												maxWidth: '100px',
-											} }
-										>
-											<ToggleControl
-												__nextHasNoMarginBottom
-												checked={
-													table.status === 'publish'
-												}
-												onChange={ () =>
-													updateStatus( table )
-												}
-											/>
-										</span>
-										<Text style={ { flex: 1 } }>
-											{ settings.displayIn === 'shop'
-												? __(
-														'Shop pages',
-														'table-for-woocommerce'
-												  )
-												: __(
-														'Shortcode',
-														'table-for-woocommerce'
-												  ) }
-										</Text>
-										<span
-											style={ {
-												flex: 1,
-												maxWidth: '200px',
-											} }
-										>
-											<HStack>
-												<TextControl
-													className="adpro-w-full"
+											</Text>
+										</>
+									) }
+									{ tables.map( ( table ) => {
+										const settings = getSettings( table );
+										const shortcode = `[product_table id="${ table.id }"]`;
+										return (
+											<div
+												className="prta-dashboard-row"
+												key={ table.id }
+											>
+												<CheckboxControl
 													__nextHasNoMarginBottom
-													__next40pxDefaultSize
-													value={ shortcode }
-													readOnly
-													label="shortcode"
-													hideLabelFromVision
+													checked={ selected.includes(
+														table.id
+													) }
+													onChange={ ( checked ) =>
+														setSelected(
+															checked
+																? [
+																		...selected,
+																		table.id,
+																  ]
+																: selected.filter(
+																		(
+																			id
+																		) =>
+																			id !==
+																			table.id
+																  )
+														)
+													}
 												/>
-												<ClipboardButton
-													text={ shortcode }
-													variant={
-														hasCopied === table.id
-															? 'primary'
-															: 'secondary'
-													}
-													onCopy={ () =>
-														setHasCopied( table.id )
-													}
-													onFinishCopy={ () =>
-														setHasCopied( null )
+												<Button
+													variant="link"
+													onClick={ () =>
+														onEdit( table.id )
 													}
 												>
-													{ hasCopied === table.id
+													#{ table.id }
+												</Button>
+												<Button
+													variant="link"
+													onClick={ () =>
+														onEdit( table.id )
+													}
+												>
+													{ table.title?.rendered ||
+														__(
+															'(no title)',
+															'table-for-woocommerce'
+														) }
+												</Button>
+												<span>
+													<ToggleControl
+														__nextHasNoMarginBottom
+														checked={
+															table.status ===
+															'publish'
+														}
+														onChange={ () =>
+															updateStatus(
+																table
+															)
+														}
+													/>
+												</span>
+												<Text>
+													{ settings.displayIn ===
+													'shop'
 														? __(
-																'Copied',
+																'Shop pages',
 																'table-for-woocommerce'
 														  )
 														: __(
-																'Copy',
+																'Shortcode',
 																'table-for-woocommerce'
 														  ) }
-												</ClipboardButton>
-											</HStack>
-										</span>
-										<DropdownMenu
-											icon="ellipsis"
-											label={ __(
-												'Table actions',
-												'table-for-woocommerce'
-											) }
-											controls={ [
-												{
-													title: __(
-														'Edit',
-														'table-for-woocommerce'
-													),
-													icon: 'edit',
-													onClick: () =>
-														onEdit( table.id ),
-												},
-												{
-													title: __(
-														'Delete',
-														'table-for-woocommerce'
-													),
-													icon: 'trash',
-													onClick: () =>
-														deleteTables( [
-															table.id,
-														] ),
-												},
-											] }
-										/>
-									</HStack>
+												</Text>
+												<span className="prta-dashboard-shortcode">
+													<div className="prta-dashboard-copy">
+														<TextControl
+															className="adpro-w-full"
+															__nextHasNoMarginBottom
+															__next40pxDefaultSize
+															value={ shortcode }
+															readOnly
+															label="shortcode"
+															hideLabelFromVision
+														/>
+														<ClipboardButton
+															text={ shortcode }
+															variant="secondary"
+															icon={
+																hasCopied ===
+																table.id
+																	? 'yes'
+																	: 'admin-page'
+															}
+															label={
+																hasCopied ===
+																table.id
+																	? __(
+																			'Copied',
+																			'table-for-woocommerce'
+																	  )
+																	: __(
+																			'Copy shortcode',
+																			'table-for-woocommerce'
+																	  )
+															}
+															onCopy={ () =>
+																setHasCopied(
+																	table.id
+																)
+															}
+															onFinishCopy={ () =>
+																setHasCopied(
+																	null
+																)
+															}
+														/>
+													</div>
+												</span>
+												<div className="prta-dashboard-action">
+													<DropdownMenu
+														icon="ellipsis"
+														label={ __(
+															'Table actions',
+															'table-for-woocommerce'
+														) }
+														controls={ [
+															{
+																title: __(
+																	'Edit',
+																	'table-for-woocommerce'
+																),
+																icon: 'edit',
+																onClick: () =>
+																	onEdit(
+																		table.id
+																	),
+															},
+															{
+																title: __(
+																	'Copy',
+																	'table-for-woocommerce'
+																),
+																icon: 'admin-page',
+																isDisabled:
+																	copyingId ===
+																	table.id,
+																onClick: () =>
+																	copyTable(
+																		table
+																	),
+															},
+															{
+																title: __(
+																	'Delete',
+																	'table-for-woocommerce'
+																),
+																icon: 'trash',
+																onClick: () =>
+																	setPendingDelete(
+																		[
+																			table.id,
+																		]
+																	),
+															},
+														] }
+													/>
+												</div>
+											</div>
+										);
+									} ) }
 								</div>
-							);
-						} ) }
-						{ totalPages > 1 && (
-							<>
-								<Divider margin="5" />
-								<Pagination
-									currentPage={ page }
-									totalPages={ totalPages }
-									onPageChange={ setPage }
-								/>
-							</>
-						) }
-					</>
-				) }
-			</CardBody>
-		</Card>
+							</div>
+							{ totalPages > 1 && (
+								<>
+									<Divider margin="5" />
+									<Pagination
+										currentPage={ page }
+										totalPages={ totalPages }
+										onPageChange={ setPage }
+									/>
+								</>
+							) }
+						</>
+					) }
+				</CardBody>
+			</Card>
+			{ pendingDelete.length > 0 && (
+				<Modal
+					role="alertdialog"
+					title={
+						pendingDelete.length === 1
+							? __( 'Delete table?', 'table-for-woocommerce' )
+							: __( 'Delete tables?', 'table-for-woocommerce' )
+					}
+					size="small"
+					onRequestClose={ () =>
+						! deleting && setPendingDelete( [] )
+					}
+					isDismissible={ ! deleting }
+				>
+					<p>
+						{ pendingTable
+							? sprintf(
+									/* translators: %s: Product table name. */
+									__(
+										'Delete “%s”? This cannot be undone.',
+										'table-for-woocommerce'
+									),
+									pendingTable.title?.raw ||
+										pendingTable.title?.rendered ||
+										__(
+											'(no title)',
+											'table-for-woocommerce'
+										)
+							  )
+							: __(
+									'Are you sure you want to delete the selected tables? This cannot be undone.',
+									'table-for-woocommerce'
+							  ) }
+					</p>
+					<HStack justify="flex-end" spacing={ 2 }>
+						<Button
+							disabled={ deleting }
+							onClick={ () => setPendingDelete( [] ) }
+						>
+							{ __( 'Cancel', 'table-for-woocommerce' ) }
+						</Button>
+						<Button
+							variant="primary"
+							isDestructive
+							isBusy={ deleting }
+							disabled={ deleting }
+							onClick={ deleteTables }
+						>
+							{ __( 'Delete', 'table-for-woocommerce' ) }
+						</Button>
+					</HStack>
+				</Modal>
+			) }
+		</>
 	);
 };
 export default Dashboard;

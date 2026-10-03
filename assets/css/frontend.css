@@ -9,16 +9,14 @@
     --prta-accent: #243b53;
     --prta-on-accent: #fff;
     --prta-focus: #2563eb;
-    --prta-radius: 10px;
+    --prta-radius: 5px;
     container-type: inline-size;
     isolation: isolate;
     width: 100%;
     max-width: 100%;
     min-width: 0;
     margin-block: 16px;
-    padding: clamp(10px, 1.5vw, 16px);
-    border: 1px solid var(--prta-border);
-    border-radius: 12px;
+    border-radius: 5px;
     background: var(--prta-surface);
     color: var(--prta-text);
     font-family: inherit;
@@ -46,6 +44,9 @@
 .prta-wrapper .prta-field { display: flex; flex: 1 1 150px; flex-direction: column; gap: 4px; margin: 0; min-width: 0; }
 .prta-wrapper .prta-field-label { color: var(--prta-muted); font-size: 12px; font-weight: 600; line-height: 1.5; }
 .prta-wrapper .prta-search { flex: 2 1 240px; }
+.prta-wrapper .prta-search-control { display: flex; width: 100%; }
+.prta-wrapper .prta-search-control input[type="search"] { flex: 1 1 auto; width: 0; min-width: 0; border-start-end-radius: 0; border-end-end-radius: 0; }
+.prta-wrapper .prta-search-control .prta-button { border-inline-start: 0; border-start-start-radius: 0; border-end-start-radius: 0; }
 .prta-wrapper input[type="search"],
 .prta-wrapper input[type="number"],
 .prta-wrapper select {
@@ -65,7 +66,8 @@
     line-height: 1.4;
     letter-spacing: normal;
 }
-.prta-wrapper select { appearance: auto; padding-inline-end: 28px; cursor: pointer; }
+.prta-wrapper select { appearance: auto; padding-inline-end: 36px; cursor: pointer; }
+.prta-wrapper .prta-filters select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23596373' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; }
 .prta-wrapper input::placeholder { color: var(--prta-muted); opacity: 1; }
 .prta-wrapper .prta-button {
     appearance: none;
@@ -101,8 +103,7 @@
 .prta-wrapper .prta-button:hover:not(:disabled) { box-shadow: inset 0 0 0 100px rgb(0 0 0 / 8%); }
 .prta-wrapper .prta-button:disabled { background: var(--prta-subtle); border-color: var(--prta-border); color: var(--prta-muted); cursor: not-allowed; }
 .prta-wrapper .prta-reset-filters { display: inline-flex; align-items: center; min-height: 44px; padding: 8px; font-size: 14px; order: 1; }
-.prta-wrapper :is(a, button, input, select, [tabindex]):focus-visible { outline: 3px solid var(--prta-focus); outline-offset: 3px; }
-.prta-wrapper .prta-scroll-hint { margin: 0 0 10px; color: var(--prta-muted); font-size: 12px; }
+.prta-wrapper :is(a, button, input, select, [tabindex]):focus-visible { outline: 1px solid var(--prta-focus); outline-offset: 3px; }
 .prta-wrapper .prta-table-scroll {
     overflow-x: auto;
     width: 100%;
@@ -136,14 +137,16 @@
 .prta-wrapper .prta-table .stock { display: inline-flex; margin: 0; padding: 4px 9px; border-radius: 20px; background: #edf7f0; color: #24613b; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .prta-wrapper .prta-table .out-of-stock { background: #fff0ef; color: #9a3027; }
 .prta-wrapper .prta-table .available-on-backorder { background: #fff6e5; color: #795015; }
-.prta-wrapper .prta-buy-controls { display: flex; align-items: center; gap: 8px; }
+.prta-wrapper .prta-table .prta-column-buy { text-align: right; }
+.prta-wrapper .prta-buy-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; width: 100%; }
+.prta-wrapper .prta-variable-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; width: 100%; }
+.prta-wrapper .prta-variable-controls select { display: inline-block; width: auto; min-width: 85px; max-width: 140px; min-height: 32px; padding: 4px 20px 4px 7px; font-size: 13px; }
 .prta-wrapper .prta-buy-controls .prta-button { white-space: nowrap; }
 .prta-wrapper input.prta-qty { flex: 0 0 64px; width: 64px; min-width: 64px; padding: 10px 6px; text-align: center; font-variant-numeric: tabular-nums; }
 .prta-wrapper input[type="checkbox"] { appearance: auto; position: static; display: inline-block; flex: 0 0 24px; width: 24px; height: 24px; min-width: 24px; margin: 0; vertical-align: middle; opacity: 1; accent-color: var(--prta-accent); cursor: pointer; }
-.prta-wrapper .prta-table th input[type="checkbox"] { margin-inline-end: 8px; }
-.prta-wrapper .prta-bulk-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding-block: 12px; }
-.prta-wrapper .prta-selection-status { color: var(--prta-muted); font-size: 13px; }
-.prta-wrapper .prta-pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-block-start: 12px; margin-block-start: 4px; border-block-start: 1px solid var(--prta-border); color: var(--prta-muted); font-size: 13px; }
+.prta-wrapper .prta-select-all-heading { display: flex; align-items: center; justify-content: flex-end; gap: 12px; width: 100%; text-align: right; }
+.prta-wrapper .prta-select-all-heading .prta-bulk-submit { white-space: nowrap; }
+.prta-wrapper .prta-pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-block-start: 12px; margin-block-start: 4px; color: var(--prta-muted); font-size: 13px; }
 .prta-wrapper .prta-pagination form,
 .prta-wrapper .prta-pagination label,
 .prta-wrapper .prta-pages-info { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; }
@@ -154,6 +157,8 @@
 .prta-wrapper ul.page-numbers li::before { content: none; }
 .prta-wrapper ul.page-numbers :is(a, span) { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--prta-border); border-radius: 6px; background: var(--prta-surface); color: var(--prta-text); font: inherit; text-decoration: none; }
 .prta-wrapper ul.page-numbers a:hover { background: var(--prta-subtle); }
+.prta-wrapper ul.page-numbers :is(.prev, .next) { font-size: 20px; line-height: 1; }
+.prta-wrapper ul.page-numbers .prta-sr-only { min-width: 0; min-height: 0; padding: 0; border: 0; }
 .prta-wrapper ul.page-numbers .current { border-color: var(--prta-accent); background: var(--prta-accent); color: var(--prta-on-accent); font-weight: 600; }
 .prta-wrapper ul.page-numbers .dots { border-color: transparent; background: transparent; }
 .prta-wrapper .prta-table .prta-empty { padding: 36px 20px; text-align: center; }

@@ -3,6 +3,39 @@
     'use strict';
     function init() {
         document.querySelectorAll('.prta-wrapper').forEach(function (wrapper) {
+            function formatPrice(amount) {
+                const format = window.prtaPriceFormat;
+                if (!format) return String(amount);
+                const decimals = Math.max(0, Number(format.decimals) || 0);
+                const parts = Number(amount).toFixed(decimals).split('.');
+                const integer = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, format.thousandSeparator);
+                const number = integer + (parts[1] ? format.decimalSeparator + parts[1] : '');
+                const space = format.position.endsWith('_space') ? '\u00a0' : '';
+                return format.position.startsWith('right') ? number + space + format.symbol : format.symbol + space + number;
+            }
+            function updateTotals() {
+                wrapper.querySelectorAll('.prta-cart-form tbody tr').forEach(function (row) {
+                    const total = row.querySelector('.prta-line-total');
+                    if (!total) return;
+                    const quantity = row.querySelector('.prta-qty');
+                    const count = quantity ? Math.max(1, Number(quantity.value) || 1) : 1;
+                    total.textContent = formatPrice((Number(total.dataset.price) || 0) * count);
+                });
+            }
+            wrapper.querySelectorAll('.prta-qty').forEach(function (input) {
+                input.addEventListener('input', updateTotals);
+            });
+            const search = wrapper.querySelector('.prta-search input[type="search"]');
+            if (search) {
+                let searchTimer;
+            search.addEventListener('input', function () {
+                window.clearTimeout(searchTimer);
+                searchTimer = window.setTimeout(function () {
+                    if (typeof search.form.requestSubmit === 'function') search.form.requestSubmit();
+                    else search.form.submit();
+                }, 400);
+            });
+            }
             wrapper.querySelectorAll('.prta-filters select, .prta-pagination select').forEach(function (select) {
                 select.addEventListener('change', function () {
                     const form = select.form;
@@ -13,42 +46,63 @@
                 });
             });
             const boxes = Array.from(wrapper.querySelectorAll('.prta-checkbox'));
+			wrapper.querySelectorAll('.prta-variable-controls').forEach(function (controls) {
+				const selects = Array.from(controls.querySelectorAll('.prta-attribute'));
+				const variation = controls.querySelector('.prta-variation');
+				const availableVariations = JSON.parse(controls.dataset.variations || '[]');
+				const button = controls.querySelector('.prta-cart');
+				function syncVariation() {
+					const complete = selects.length > 0 && selects.every(function (select) { return Boolean(select.value); });
+					const match = complete && availableVariations.find(function (item) {
+						return selects.every(function (select) {
+							const value = item.attributes[select.dataset.attribute];
+							return value === '' || value === select.value;
+						});
+					});
+					variation.value = match ? String(match.id) : '';
+					const rowTotal = controls.closest('tr').querySelector('.prta-line-total');
+					if (rowTotal) {
+						if (!rowTotal.dataset.basePrice) rowTotal.dataset.basePrice = rowTotal.dataset.price;
+						rowTotal.dataset.price = match ? String(match.price) : rowTotal.dataset.basePrice;
+					}
+					const available = Boolean(match);
+					button.disabled = !available;
+					updateTotals();
+				}
+				selects.forEach(function (select) { select.addEventListener('change', syncVariation); });
+				window.addEventListener('pageshow', syncVariation);
+				syncVariation();
+			});
             const toggles = wrapper.querySelectorAll('.prta-select-all');
-            const statuses = wrapper.querySelectorAll('.prta-selection-status');
             function update() {
-                const count = boxes.filter(function (box) { return box.checked; }).length;
+                const availableBoxes = boxes.filter(function (box) { return !box.disabled; });
+                const count = availableBoxes.filter(function (box) { return box.checked; }).length;
                 boxes.forEach(function (box) {
                     box.closest('tr').classList.toggle('prta-is-selected', box.checked);
                 });
                 toggles.forEach(function (toggle) {
-                    toggle.checked = boxes.length > 0 && count === boxes.length;
-                    toggle.indeterminate = count > 0 && count < boxes.length;
-                    toggle.disabled = boxes.length === 0;
+                    toggle.checked = availableBoxes.length > 0 && count === availableBoxes.length;
+                    toggle.indeterminate = count > 0 && count < availableBoxes.length;
+                    toggle.disabled = availableBoxes.length === 0;
                 });
                 wrapper.querySelectorAll('.prta-bulk-submit').forEach(function (button) {
                     button.disabled = count === 0;
-                });
-                statuses.forEach(function (status) {
-                    status.textContent = count ? status.dataset.template.replace('%s', String(count)) : '';
+                    button.textContent = button.dataset.countTemplate.replace('%s', String(count));
                 });
             }
             toggles.forEach(function (toggle) {
-                toggle.hidden = false;
                 toggle.addEventListener('change', function () {
-                    boxes.forEach(function (box) { box.checked = toggle.checked; });
+                    const availableBoxes = boxes.filter(function (box) { return !box.disabled; });
+                    availableBoxes.forEach(function (box) { box.checked = toggle.checked; });
                     update();
                 });
             });
             boxes.forEach(function (box) { box.addEventListener('change', update); });
             const scroll = wrapper.querySelector('.prta-table-scroll');
-            const hint = wrapper.querySelector('.prta-scroll-hint');
             function updateOverflow() {
-                if (!scroll || !hint) return;
+                if (!scroll) return;
                 const overflows = scroll.scrollWidth > scroll.clientWidth + 1;
-                hint.hidden = !overflows;
                 scroll.tabIndex = overflows ? 0 : -1;
-                if (overflows) scroll.setAttribute('aria-describedby', hint.id);
-                else scroll.removeAttribute('aria-describedby');
             }
             if (typeof ResizeObserver !== 'undefined' && scroll) {
                 const observer = new ResizeObserver(updateOverflow);
@@ -60,6 +114,7 @@
             window.addEventListener('pageshow', update);
             updateOverflow();
             update();
+            updateTotals();
         });
     }
     if (document.readyState === 'loading') {

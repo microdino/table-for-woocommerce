@@ -5,19 +5,16 @@ import {
 	Card,
 	CardBody,
 	CheckboxControl,
+	FormTokenField,
 	RadioControl,
 	Snackbar,
 	SelectControl,
 	Spinner,
 	TextControl,
 	ToggleControl,
-	__experimentalDivider as Divider,
-	__experimentalGrid as Grid,
 	__experimentalHeading as Heading,
-	__experimentalHStack as HStack,
 	__experimentalNumberControl as NumberControl,
 	__experimentalText as Text,
-	__experimentalVStack as VStack,
 } from '@wordpress/components';
 
 const API_PATH = '/wp/v2/adpro_option';
@@ -88,6 +85,13 @@ const normalizeItems = ( value, options ) => {
 const defaults = {
 	tableName: '',
 	displayIn: 'shortcode',
+	queryType: 'all',
+	queryCategories: [],
+	queryTags: [],
+	queryProducts: [],
+	queryBrands: [],
+	excludeProducts: [],
+	excludeCategories: [],
 	shopPage: false,
 	searchPage: false,
 	categoryPage: false,
@@ -101,16 +105,105 @@ const defaults = {
 	variationStyle: 'dropdown',
 	productsPerPage: 20,
 	searchFilters: [ makeItem( 'tax:pa_color', FILTER_OPTIONS ) ],
-	sortBy: 'sorting',
+	sortBy: 'default',
 	sortDirection: 'automatic',
-	cartLocation: 'below',
-	selectAll: false,
 	descriptionLength: 15,
+};
+
+const QueryPicker = ( { label, type, value = [], onChange } ) => {
+	const [ search, setSearch ] = useState( '' );
+	const [ options, setOptions ] = useState( [] );
+	const [ labels, setLabels ] = useState( {} );
+	useEffect( () => {
+		let active = true;
+		const timer = setTimeout( async () => {
+			try {
+				const results = await wp.apiFetch( {
+					path: `/prta/v1/query-options?type=${ type }&search=${ encodeURIComponent(
+						search
+					) }&include=${ value.join( ',' ) }`,
+				} );
+				if ( active ) {
+					setOptions( results );
+					setLabels( ( current ) => ( {
+						...current,
+						...Object.fromEntries(
+							results.map( ( item ) => [
+								item.value,
+								item.label,
+							] )
+						),
+					} ) );
+				}
+			} catch ( error ) {
+				if ( active ) setOptions( [] );
+			}
+		}, 200 );
+		return () => {
+			active = false;
+			clearTimeout( timer );
+		};
+	}, [ type, search, value.join( ',' ) ] );
+	const tokenFor = ( id ) => `${ labels[ id ] || `#${ id }` } (#${ id })`;
+	const tokenId = ( token ) => {
+		const text = typeof token === 'string' ? token : token.value;
+		return Number( text.match( /\(#(\d+)\)$/ )?.[ 1 ] || 0 );
+	};
+	return (
+		<FormTokenField
+			label={ label }
+			placeholder={
+				type === 'products'
+					? __(
+							'Search and select products…',
+							'table-for-woocommerce'
+					  )
+					: type === 'categories'
+					? __(
+							'Search and select categories…',
+							'table-for-woocommerce'
+					  )
+					: type === 'tags'
+					? __( 'Search and select tags…', 'table-for-woocommerce' )
+					: __( 'Search and select brands…', 'table-for-woocommerce' )
+			}
+			value={ value.map( tokenFor ) }
+			suggestions={ options
+				.filter( ( option ) => ! value.includes( option.value ) )
+				.map( ( option ) => tokenFor( option.value ) ) }
+			onInputChange={ setSearch }
+			onChange={ ( tokens ) =>
+				onChange( [
+					...new Set(
+						tokens
+							.map( tokenId )
+							.filter(
+								( id ) =>
+									value.includes( id ) ||
+									options.some(
+										( option ) => option.value === id
+									)
+							)
+					),
+				] )
+			}
+			__experimentalValidateInput={ ( token ) => {
+				const id = tokenId( token );
+				return (
+					value.includes( id ) ||
+					options.some( ( option ) => option.value === id )
+				);
+			} }
+			__experimentalShowHowTo={ false }
+			__experimentalAutoSelectFirstMatch
+			__next40pxDefaultSize
+			__nextHasNoMarginBottom
+		/>
+	);
 };
 
 const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 	const [ selected, setSelected ] = useState( '' );
-	const [ editing, setEditing ] = useState( null );
 	const [ dragged, setDragged ] = useState( null );
 	const add = () => {
 		if ( ! selected || items.some( ( item ) => item.value === selected ) )
@@ -149,35 +242,24 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 					>
 						⠿
 					</span>
-					<Button
-						className="prta-edit-label"
-						icon="edit"
-						label={ __( 'Edit title', 'table-for-woocommerce' ) }
-						onClick={ () =>
-							setEditing( editing === item.id ? null : item.id )
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						aria-label={ __(
+							'Column or filter title',
+							'table-for-woocommerce'
+						) }
+						value={ item.label }
+						onChange={ ( label ) =>
+							onChange(
+								items.map( ( current ) =>
+									current.id === item.id
+										? { ...current, label }
+										: current
+								)
+							)
 						}
 					/>
-					{ editing === item.id ? (
-						<TextControl
-							__next40pxDefaultSize
-							__nextHasNoMarginBottom
-							value={ item.label }
-							onChange={ ( label ) =>
-								onChange(
-									items.map( ( current ) =>
-										current.id === item.id
-											? { ...current, label }
-											: current
-									)
-								)
-							}
-							onBlur={ () => setEditing( null ) }
-						/>
-					) : (
-						<strong className="prta-field-title">
-							{ item.label }
-						</strong>
-					) }
 					<code>{ item.value }</code>
 					<Button
 						className="prta-remove-field"
@@ -193,7 +275,7 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 					/>
 				</div>
 			) ) }
-			<HStack alignment="left" className="prta-field-add">
+			<div className="prta-field-add">
 				<SelectControl
 					__next40pxDefaultSize
 					__nextHasNoMarginBottom
@@ -212,34 +294,31 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 				<Button
 					__next40pxDefaultSize
 					variant="secondary"
+					icon="plus"
 					disabled={ ! selected }
 					onClick={ add }
 				>
 					{ __( 'Add', 'table-for-woocommerce' ) }
 				</Button>
-			</HStack>
+			</div>
 		</div>
 	);
 };
 
 const Section = ( { title, description, children } ) => (
-	<>
-		<Grid templateColumns="1fr 4fr" gap={ 10 }>
-			<VStack alignment="topLeft" spacing={ 2 }>
-				<Heading level={ 4 }>{ title }</Heading>
-				{ description && <Text variant="muted">{ description }</Text> }
-			</VStack>
-			<VStack spacing={ 5 } style={ { maxWidth: '500px' } }>
-				{ children }
-			</VStack>
-		</Grid>
-		<Divider margin={ 6 } style={ { borderColor: 'rgba(0, 0, 0, 0.1)' } } />
-	</>
+	<section className="prta-editor-section">
+		<div className="prta-editor-section-heading">
+			<Heading level={ 4 }>{ title }</Heading>
+			{ description && <Text variant="muted">{ description }</Text> }
+		</div>
+		<div className="prta-editor-fields">{ children }</div>
+	</section>
 );
 
 const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 	const [ settings, setSettings ] = useState( defaults );
 	const [ activeTableId, setActiveTableId ] = useState( tableId );
+	const [ postStatus, setPostStatus ] = useState( 'publish' );
 	const [ loading, setLoading ] = useState( Boolean( tableId ) );
 	const [ saving, setSaving ] = useState( false );
 	const [ snackbar, setSnackbar ] = useState( null );
@@ -251,12 +330,14 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 		setActiveTableId( tableId );
 		if ( ! tableId ) {
 			setSettings( defaults );
+			setPostStatus( 'publish' );
 			setLoading( false );
 			return;
 		}
 		setLoading( true );
 		wp.apiFetch( { path: `${ API_PATH }/${ tableId }?context=edit` } )
 			.then( ( post ) => {
+				setPostStatus( post.status );
 				let saved = {};
 				try {
 					saved = JSON.parse( post.content?.raw || '{}' );
@@ -266,6 +347,10 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 				setSettings( {
 					...defaults,
 					...saved,
+					sortBy:
+						saved.sortBy === 'sorting'
+							? 'default'
+							: saved.sortBy || defaults.sortBy,
 					tableName: post.title?.raw || saved.tableName || '',
 					columns: normalizeItems(
 						saved.columns ?? defaults.columns,
@@ -308,7 +393,7 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 				data: {
 					title: settings.tableName.trim(),
 					content: JSON.stringify( settings ),
-					status: 'publish',
+					status: postStatus,
 				},
 			} );
 			setActiveTableId( savedPost.id );
@@ -346,16 +431,24 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 		}
 	};
 
-	if ( loading )
+	if ( loading ) {
 		return (
-			<Card style={ { margin: '20px 20px 20px 0' } }>
+			<Card
+				className="prta-editor-card"
+				style={ { margin: '20px 20px 20px 0' } }
+			>
 				<CardBody>
 					<Spinner />
 				</CardBody>
 			</Card>
 		);
+	}
+
 	return (
-		<Card style={ { margin: '20px 20px 20px 0' } }>
+		<Card
+			className="prta-editor-card"
+			style={ { margin: '20px 20px 20px 0' } }
+		>
 			<CardBody>
 				{ snackbar && (
 					<div
@@ -372,8 +465,8 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 							onRemove={ () => setSnackbar( null ) }
 						>
 							{ snackbar.type === 'success'
-								? __( 'Success: ', 'table-for-woocommerce' )
-								: __( 'Error: ', 'table-for-woocommerce' ) }
+								? __( 'Success:', 'table-for-woocommerce' )
+								: __( 'Error:', 'table-for-woocommerce' ) }
 							{ snackbar.message }
 						</Snackbar>
 					</div>
@@ -417,27 +510,154 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 						] }
 					/>
 					{ settings.displayIn === 'shortcode' ? (
-						<div>
-							<TextControl
-								label={ __(
-									'Shortcode',
-									'table-for-woocommerce'
-								) }
-								value={ shortcode }
-								readOnly
-							/>
-							<Button
-								variant="secondary"
-								disabled={ ! activeTableId }
-								onClick={ copyShortcode }
-							>
-								{ copied
-									? __( 'Copied', 'table-for-woocommerce' )
-									: __( 'Copy', 'table-for-woocommerce' ) }
-							</Button>
-						</div>
-					) : (
 						<>
+							<div className="prta-shortcode-control">
+								<TextControl
+									__next40pxDefaultSize
+									__nextHasNoMarginBottom
+									label={ __(
+										'Shortcode',
+										'table-for-woocommerce'
+									) }
+									value={ shortcode }
+									readOnly
+								/>
+								<Button
+									className="components-clipboard-button prta-copy-shortcode"
+									variant="secondary"
+									icon={ copied ? 'yes' : 'admin-page' }
+									label={
+										copied
+											? __(
+													'Copied',
+													'table-for-woocommerce'
+											  )
+											: __(
+													'Copy shortcode',
+													'table-for-woocommerce'
+											  )
+									}
+									disabled={ ! activeTableId }
+									onClick={ copyShortcode }
+								/>
+							</div>
+							<div className="prta-editor-row">
+								<SelectControl
+									label={ __(
+										'Product Query',
+										'table-for-woocommerce'
+									) }
+									value={ settings.queryType }
+									onChange={ ( value ) =>
+										set( 'queryType', value )
+									}
+									options={ [
+										{
+											value: 'all',
+											label: __(
+												'All Products',
+												'table-for-woocommerce'
+											),
+										},
+										{
+											value: 'categories',
+											label: __(
+												'Specific Categories',
+												'table-for-woocommerce'
+											),
+										},
+										{
+											value: 'tags',
+											label: __(
+												'Specific Tags',
+												'table-for-woocommerce'
+											),
+										},
+										{
+											value: 'products',
+											label: __(
+												'Specific Products',
+												'table-for-woocommerce'
+											),
+										},
+										{
+											value: 'brands',
+											label: __(
+												'Specific Brands',
+												'table-for-woocommerce'
+											),
+										},
+									] }
+									__next40pxDefaultSize
+									__nextHasNoMarginBottom
+								/>
+								{ settings.queryType !== 'all' && (
+									<QueryPicker
+										label={ __(
+											'Select items',
+											'table-for-woocommerce'
+										) }
+										type={ settings.queryType }
+										value={
+											settings[
+												`query${
+													settings.queryType[ 0 ].toUpperCase() +
+													settings.queryType.slice(
+														1
+													)
+												}`
+											] || []
+										}
+										onChange={ ( value ) =>
+											set(
+												`query${
+													settings.queryType[ 0 ].toUpperCase() +
+													settings.queryType.slice(
+														1
+													)
+												}`,
+												value
+											)
+										}
+									/>
+								) }
+							</div>
+							{ settings.queryType !== 'products' && (
+								<div className="prta-editor-row">
+									{ settings.queryType !== 'products' && (
+										<QueryPicker
+											label={ __(
+												'Exclude Specific Products',
+												'table-for-woocommerce'
+											) }
+											type="products"
+											value={ settings.excludeProducts }
+											onChange={ ( value ) =>
+												set( 'excludeProducts', value )
+											}
+										/>
+									) }
+									{ settings.queryType === 'all' && (
+										<QueryPicker
+											label={ __(
+												'Exclude Categories',
+												'table-for-woocommerce'
+											) }
+											type="categories"
+											value={ settings.excludeCategories }
+											onChange={ ( value ) =>
+												set(
+													'excludeCategories',
+													value
+												)
+											}
+										/>
+									) }
+								</div>
+							) }
+						</>
+					) : (
+						<div className="prta-page-options">
 							<CheckboxControl
 								__nextHasNoMarginBottom
 								label={ __(
@@ -504,7 +724,7 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 									set( 'brandPage', value )
 								}
 							/>
-						</>
+						</div>
 					) }
 				</Section>
 				<Section title={ __( 'Columns', 'table-for-woocommerce' ) }>
@@ -531,6 +751,8 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 						) }
 					/>
 					<SelectControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
 						label={ __(
 							'Variation Display Style',
 							'table-for-woocommerce'
@@ -562,6 +784,8 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 						onChange={ ( value ) => set( 'variationStyle', value ) }
 					/>
 					<NumberControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
 						label={ __(
 							'Products per page',
 							'table-for-woocommerce'
@@ -576,48 +800,113 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 				<Section
 					title={ __( 'Search Filters', 'table-for-woocommerce' ) }
 					description={ __(
-						'Add, rename, remove, and reorder filters.',
+						'Choose the filters to show above the table.',
 						'table-for-woocommerce'
 					) }
 				>
-					<DynamicFieldList
-						items={ settings.searchFilters }
-						options={ FILTER_OPTIONS }
-						placeholder={ __(
-							'Choose a Search Filter',
-							'table-for-woocommerce'
-						) }
-						onChange={ ( value ) => set( 'searchFilters', value ) }
-					/>
-					<SelectControl
-						label={ __( 'Sort By', 'table-for-woocommerce' ) }
-						value={ settings.sortBy }
-						options={ [
-							'sorting',
-							'id',
-							'name',
-							'published',
-							'modified',
-							'sales',
-							'rating',
-							'random',
-							'price',
-						].map( ( value ) => ( { value, label: value } ) ) }
-						onChange={ ( value ) => set( 'sortBy', value ) }
-					/>
-					<SelectControl
-						label={ __(
-							'Sort Direction',
-							'table-for-woocommerce'
-						) }
-						value={ settings.sortDirection }
-						options={ [
-							'automatic',
-							'ascending',
-							'descending',
-						].map( ( value ) => ( { value, label: value } ) ) }
-						onChange={ ( value ) => set( 'sortDirection', value ) }
-					/>
+					<div className="prta-search-filter-options">
+						{ FILTER_OPTIONS.map( ( option ) => (
+							<CheckboxControl
+								key={ option.value }
+								label={ option.label }
+								checked={ settings.searchFilters.some(
+									( item ) => item.value === option.value
+								) }
+								onChange={ ( checked ) =>
+									set(
+										'searchFilters',
+										checked
+											? [
+													...settings.searchFilters,
+													makeItem(
+														option.value,
+														FILTER_OPTIONS
+													),
+											  ]
+											: settings.searchFilters.filter(
+													( item ) =>
+														item.value !==
+														option.value
+											  )
+									)
+								}
+								__nextHasNoMarginBottom
+							/>
+						) ) }
+					</div>
+					<div className="prta-editor-row">
+						<SelectControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __( 'Sort By', 'table-for-woocommerce' ) }
+							value={ settings.sortBy }
+							options={ [
+								{
+									label: 'Default WooCommerce',
+									value: 'default',
+								},
+								{
+									label: 'ID',
+									value: 'id',
+								},
+								{
+									label: 'Name',
+									value: 'name',
+								},
+								{
+									label: 'Published',
+									value: 'published',
+								},
+								{
+									label: 'Modified',
+									value: 'modified',
+								},
+								{
+									label: 'Sales',
+									value: 'sales',
+								},
+								{
+									label: 'Rating',
+									value: 'rating',
+								},
+								{
+									label: 'Random',
+									value: 'random',
+								},
+								{
+									label: 'Price',
+									value: 'price',
+								},
+							] }
+							onChange={ ( value ) => set( 'sortBy', value ) }
+						/>
+						<SelectControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Sort Direction',
+								'table-for-woocommerce'
+							) }
+							value={ settings.sortDirection }
+							options={ [
+								{
+									label: 'Automatic',
+									value: 'automatic',
+								},
+								{
+									label: 'Ascending',
+									value: 'ascending',
+								},
+								{
+									label: 'Descending',
+									value: 'descending',
+								},
+							] }
+							onChange={ ( value ) =>
+								set( 'sortDirection', value )
+							}
+						/>
+					</div>
 				</Section>
 				<Section
 					title={ __( 'Content', 'table-for-woocommerce' ) }
@@ -626,47 +915,9 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 						'table-for-woocommerce'
 					) }
 				>
-					<SelectControl
-						label={ __(
-							'Add to Cart Location',
-							'table-for-woocommerce'
-						) }
-						value={ settings.cartLocation }
-						options={ [
-							{
-								value: 'above',
-								label: __(
-									'Above Table',
-									'table-for-woocommerce'
-								),
-							},
-							{
-								value: 'below',
-								label: __(
-									'Below Table',
-									'table-for-woocommerce'
-								),
-							},
-							{
-								value: 'all',
-								label: __(
-									'Above & Below Table',
-									'table-for-woocommerce'
-								),
-							},
-						] }
-						onChange={ ( value ) => set( 'cartLocation', value ) }
-					/>
-					<ToggleControl
-						__nextHasNoMarginBottom
-						checked={ settings.selectAll }
-						onChange={ ( value ) => set( 'selectAll', value ) }
-						label={ __(
-							'Select all products in the table header',
-							'table-for-woocommerce'
-						) }
-					/>
 					<NumberControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
 						label={ __(
 							'Description Length (Words)',
 							'table-for-woocommerce'
@@ -677,7 +928,7 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 						}
 						min={ 0 }
 					/>
-					<div>
+					<div className="prta-editor-actions">
 						<Button
 							variant="secondary"
 							onClick={ onCancel }

@@ -1,3 +1,4 @@
+const { __ } = wp.i18n;
 import { Button, __experimentalHStack as HStack } from '@wordpress/components';
 
 const Pagination = ( { currentPage, totalPages, onPageChange } ) => {
@@ -13,6 +14,7 @@ const Pagination = ( { currentPage, totalPages, onPageChange } ) => {
 				__next40pxDefaultSize
 				variant="secondary"
 				icon={ 'arrow-left-alt2' }
+				label={ __( 'Previous page', 'table-for-woocommerce' ) }
 				onClick={ () => goToPage( currentPage - 1 ) }
 				disabled={ currentPage === 1 }
 			/>
@@ -36,6 +38,7 @@ const Pagination = ( { currentPage, totalPages, onPageChange } ) => {
 				__next40pxDefaultSize
 				variant="secondary"
 				icon={ 'arrow-right-alt2' }
+				label={ __( 'Next page', 'table-for-woocommerce' ) }
 				onClick={ () => goToPage( currentPage + 1 ) }
 				disabled={ currentPage === totalPages }
 			/>
