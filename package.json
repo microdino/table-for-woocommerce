@@ -2,18 +2,16 @@
 	"name": "table-for-woocommerce",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Gutenberg product table block for WooCommerce",
-	"main": "src/index.js",
+	"description": "WooCommerce product tables for shortcodes and shop archives",
 	"prettier": "@wordpress/prettier-config",
 	"scripts": {
 		"dev": "npm run watch",
-		"build": "esbuild src/index.js --bundle --outfile=assets/js/backend.js --minify --sourcemap --loader:.js=jsx --loader:.jsx=jsx",
-		"watch": "esbuild src/index.js --bundle --outfile=assets/js/backend.js --sourcemap --watch --loader:.js=jsx --loader:.jsx=jsx"
+		"build": "esbuild src/index.js --bundle --outfile=assets/js/backend.js --minify --loader:.js=jsx --loader:.jsx=jsx",
+		"watch": "esbuild src/index.js --bundle --outfile=assets/js/backend.js --sourcemap --watch --loader:.js=jsx --loader:.jsx=jsx",
+		"lint": "eslint src --ext .js",
+		"build:zip": "npm run lint && npm run build && node scripts/package-plugin.mjs"
 	},
 	"devDependencies": {
-		"@babel/core": "^7.26.0",
-		"@babel/eslint-parser": "^7.26.5",
-		"@babel/preset-react": "^7.26.3",
 		"@wordpress/components": "^30.8.0",
 		"@wordpress/eslint-plugin": "^22.0.0",
 		"@wordpress/prettier-config": "^4.16.0",
@@ -23,6 +21,6 @@
 		"prettier": "npm:wp-prettier@^3.0.3",
 		"react": "^18.3.1",
 		"react-dom": "^18.3.1",
-		"typescript": "^5.7.2"
+		"yazl": "^3.3.1"
 	}
 }

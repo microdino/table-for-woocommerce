@@ -14,12 +14,7 @@
                 "adproBackendData": "readonly"
             },
             "parserOptions": {
-                "requireConfigFile": false,
-                "babelOptions": {
-                    "presets": [
-                        "@babel/preset-react"
-                    ]
-                }
+                "requireConfigFile": false
             },
             "env": {
                 "browser": true

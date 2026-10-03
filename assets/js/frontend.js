@@ -18,12 +18,12 @@
                     const total = row.querySelector('.prta-line-total');
                     if (!total) return;
                     const quantity = row.querySelector('.prta-qty');
-                    const count = quantity ? Math.max(1, Number(quantity.value) || 1) : 1;
+                    const count = quantity ? Math.max(1, Math.floor(Number(quantity.value) || 1)) : 1;
                     total.textContent = formatPrice((Number(total.dataset.price) || 0) * count);
                 });
             }
             wrapper.querySelectorAll('.prta-qty').forEach(function (input) {
-                input.addEventListener('input', updateTotals);
+                input.addEventListener('input', function () { updateTotals(); update(); });
             });
             const search = wrapper.querySelector('.prta-search input[type="search"]');
             if (search) {
@@ -46,6 +46,7 @@
                 });
             });
             const boxes = Array.from(wrapper.querySelectorAll('.prta-checkbox'));
+			const toggles = wrapper.querySelectorAll('.prta-select-all');
 			wrapper.querySelectorAll('.prta-variable-controls').forEach(function (controls) {
 				const selects = Array.from(controls.querySelectorAll('.prta-attribute'));
 				const variation = controls.querySelector('.prta-variation');
@@ -61,22 +62,39 @@
 					});
 					variation.value = match ? String(match.id) : '';
 					const rowTotal = controls.closest('tr').querySelector('.prta-line-total');
+					const row = controls.closest('tr');
+					if (!row.dataset.basePrice) row.dataset.basePrice = row.dataset.price;
+					row.dataset.price = match ? String(match.price) : row.dataset.basePrice;
 					if (rowTotal) {
 						if (!rowTotal.dataset.basePrice) rowTotal.dataset.basePrice = rowTotal.dataset.price;
 						rowTotal.dataset.price = match ? String(match.price) : rowTotal.dataset.basePrice;
 					}
 					const available = Boolean(match);
 					button.disabled = !available;
+					const checkbox = controls.querySelector('.prta-checkbox');
+					if (checkbox) {
+						checkbox.disabled = !available;
+						if (!available) checkbox.checked = false;
+					}
 					updateTotals();
+					update();
 				}
 				selects.forEach(function (select) { select.addEventListener('change', syncVariation); });
 				window.addEventListener('pageshow', syncVariation);
 				syncVariation();
 			});
-            const toggles = wrapper.querySelectorAll('.prta-select-all');
             function update() {
                 const availableBoxes = boxes.filter(function (box) { return !box.disabled; });
                 const count = availableBoxes.filter(function (box) { return box.checked; }).length;
+                let items = 0;
+                let total = 0;
+                availableBoxes.filter(function (box) { return box.checked; }).forEach(function (box) {
+                    const row = box.closest('tr');
+                    const quantity = row.querySelector('.prta-qty');
+                    const amount = quantity ? Math.max(1, Math.floor(Number(quantity.value) || 1)) : 1;
+                    items += amount;
+                    total += (Number(row.dataset.price) || 0) * amount;
+                });
                 boxes.forEach(function (box) {
                     box.closest('tr').classList.toggle('prta-is-selected', box.checked);
                 });
@@ -87,7 +105,8 @@
                 });
                 wrapper.querySelectorAll('.prta-bulk-submit').forEach(function (button) {
                     button.disabled = count === 0;
-                    button.textContent = button.dataset.countTemplate.replace('%s', String(count));
+                    const template = items === 1 ? button.dataset.singularTemplate : button.dataset.pluralTemplate;
+                    button.textContent = template.replace(/\{items\}/g, String(items)).replace(/\{total\}/g, formatPrice(total));
                 });
             }
             toggles.forEach(function (toggle) {

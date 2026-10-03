@@ -5,7 +5,7 @@
  * Version:     1.0.0
  * Author:      JOJO
  * Author URI:  https://www.jojo.com/about
- * Text Domain: product-table
+ * Text Domain: table-for-woocommerce
  * Requires at least: 6.2
  * Tested up to: 6.8
  * WC requires at least: 8.2

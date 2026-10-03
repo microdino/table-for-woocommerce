@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import MenuBar from './dashboard/MenuBar';
 if ( document.body.contains( document.getElementById( 'prta-dashboard' ) ) ) {

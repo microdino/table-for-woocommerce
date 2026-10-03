@@ -1,4 +1,4 @@
-const { __ } = wp.i18n;
+const { __, sprintf } = wp.i18n;
 import { useEffect, useState } from 'react';
 import {
 	Button,
@@ -21,34 +21,37 @@ const API_PATH = '/wp/v2/adpro_option';
 const COLUMN_OPTIONS = [
 	[ 'id', 'ID' ],
 	[ 'sku', 'SKU' ],
-	[ 'name', 'Name' ],
-	[ 'description', 'Description' ],
-	[ 'summary', 'Summary' ],
-	[ 'date', 'Published date' ],
-	[ 'modified', 'Last modified date' ],
-	[ 'image', 'Image' ],
-	[ 'stock', 'Stock' ],
-	[ 'reviews', 'Reviews' ],
-	[ 'weight', 'Weight' ],
-	[ 'dimensions', 'Dimensions' ],
-	[ 'price', 'Price' ],
-	[ 'buy', 'Buy' ],
-	[ 'button', 'Button' ],
-	[ 'total', 'Total' ],
-	[ 'categories', 'Categories' ],
-	[ 'tags', 'Tags' ],
-	[ 'tax:pa_color', 'Color' ],
-	[ 'tax:pa_size', 'Size' ],
-	[ 'author', 'Author' ],
+	[ 'name', __( 'Name', 'table-for-woocommerce' ) ],
+	[ 'description', __( 'Description', 'table-for-woocommerce' ) ],
+	[ 'summary', __( 'Summary', 'table-for-woocommerce' ) ],
+	[ 'date', __( 'Published date', 'table-for-woocommerce' ) ],
+	[ 'modified', __( 'Last modified date', 'table-for-woocommerce' ) ],
+	[ 'image', __( 'Image', 'table-for-woocommerce' ) ],
+	[ 'stock', __( 'Stock', 'table-for-woocommerce' ) ],
+	[ 'reviews', __( 'Reviews', 'table-for-woocommerce' ) ],
+	[ 'weight', __( 'Weight', 'table-for-woocommerce' ) ],
+	[ 'dimensions', __( 'Dimensions', 'table-for-woocommerce' ) ],
+	[ 'price', __( 'Price', 'table-for-woocommerce' ) ],
+	[ 'buy', __( 'Buy', 'table-for-woocommerce' ) ],
+	[ 'button', __( 'Button', 'table-for-woocommerce' ) ],
+	[ 'total', __( 'Total', 'table-for-woocommerce' ) ],
+	[ 'categories', __( 'Categories', 'table-for-woocommerce' ) ],
+	[ 'tags', __( 'Tags', 'table-for-woocommerce' ) ],
+	[ 'tax:pa_color', __( 'Color', 'table-for-woocommerce' ) ],
+	[ 'tax:pa_size', __( 'Size', 'table-for-woocommerce' ) ],
+	[ 'author', __( 'Author', 'table-for-woocommerce' ) ],
 ].map( ( [ value, label ] ) => ( { value, label } ) );
 const FILTER_OPTIONS = [
-	[ 'categories', 'Categories' ],
-	[ 'tags', 'Tags' ],
-	[ 'tax:pa_color', 'Color' ],
-	[ 'tax:pa_size', 'Size' ],
-	[ 'product_type', 'Product Type' ],
-	[ 'product_visibility', 'Product Visibility' ],
-	[ 'author', 'Author' ],
+	[ 'categories', __( 'Categories', 'table-for-woocommerce' ) ],
+	[ 'tags', __( 'Tags', 'table-for-woocommerce' ) ],
+	[ 'tax:pa_color', __( 'Color', 'table-for-woocommerce' ) ],
+	[ 'tax:pa_size', __( 'Size', 'table-for-woocommerce' ) ],
+	[ 'product_type', __( 'Product Type', 'table-for-woocommerce' ) ],
+	[
+		'product_visibility',
+		__( 'Product Visibility', 'table-for-woocommerce' ),
+	],
+	[ 'author', __( 'Author', 'table-for-woocommerce' ) ],
 ].map( ( [ value, label ] ) => ( { value, label } ) );
 const makeItem = ( value, options ) => {
 	const option = options.find( ( item ) => item.value === value );
@@ -136,7 +139,9 @@ const QueryPicker = ( { label, type, value = [], onChange } ) => {
 					} ) );
 				}
 			} catch ( error ) {
-				if ( active ) setOptions( [] );
+				if ( active ) {
+					setOptions( [] );
+				}
 			}
 		}, 200 );
 		return () => {
@@ -206,18 +211,30 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 	const [ selected, setSelected ] = useState( '' );
 	const [ dragged, setDragged ] = useState( null );
 	const add = () => {
-		if ( ! selected || items.some( ( item ) => item.value === selected ) )
+		if ( ! selected || items.some( ( item ) => item.value === selected ) ) {
 			return;
+		}
 		onChange( [ ...items, makeItem( selected, options ) ] );
 		setSelected( '' );
 	};
 	const move = ( target ) => {
-		if ( dragged === null || dragged === target ) return;
+		if ( dragged === null || dragged === target ) {
+			return;
+		}
 		const next = [ ...items ];
 		const [ item ] = next.splice( dragged, 1 );
 		next.splice( target, 0, item );
 		onChange( next );
 		setDragged( target );
+	};
+	const moveBy = ( index, direction ) => {
+		const target = index + direction;
+		if ( target < 0 || target >= items.length ) {
+			return;
+		}
+		const next = [ ...items ];
+		[ next[ index ], next[ target ] ] = [ next[ target ], next[ index ] ];
+		onChange( next );
 	};
 	return (
 		<div className="prta-dynamic-fields">
@@ -235,6 +252,7 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 				>
 					<span
 						className="prta-drag-handle"
+						aria-hidden="true"
 						title={ __(
 							'Drag to reorder',
 							'table-for-woocommerce'
@@ -245,9 +263,10 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 					<TextControl
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
-						aria-label={ __(
-							'Column or filter title',
-							'table-for-woocommerce'
+						aria-label={ sprintf(
+							/* translators: %s: column or filter name. */
+							__( 'Title for %s', 'table-for-woocommerce' ),
+							item.label
 						) }
 						value={ item.label }
 						onChange={ ( label ) =>
@@ -261,10 +280,36 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 						}
 					/>
 					<code>{ item.value }</code>
+					<div className="prta-field-order">
+						<Button
+							icon="arrow-up-alt2"
+							label={ sprintf(
+								/* translators: %s: column or filter name. */
+								__( 'Move %s up', 'table-for-woocommerce' ),
+								item.label
+							) }
+							disabled={ index === 0 }
+							onClick={ () => moveBy( index, -1 ) }
+						/>
+						<Button
+							icon="arrow-down-alt2"
+							label={ sprintf(
+								/* translators: %s: column or filter name. */
+								__( 'Move %s down', 'table-for-woocommerce' ),
+								item.label
+							) }
+							disabled={ index === items.length - 1 }
+							onClick={ () => moveBy( index, 1 ) }
+						/>
+					</div>
 					<Button
 						className="prta-remove-field"
 						icon="dismiss"
-						label={ __( 'Remove', 'table-for-woocommerce' ) }
+						label={ sprintf(
+							/* translators: %s: column or filter name. */
+							__( 'Remove %s', 'table-for-woocommerce' ),
+							item.label
+						) }
 						onClick={ () =>
 							onChange(
 								items.filter(
@@ -277,6 +322,10 @@ const DynamicFieldList = ( { items, options, placeholder, onChange } ) => {
 			) ) }
 			<div className="prta-field-add">
 				<SelectControl
+					label={ __(
+						'Add a column or filter',
+						'table-for-woocommerce'
+					) }
 					__next40pxDefaultSize
 					__nextHasNoMarginBottom
 					value={ selected }
@@ -315,11 +364,11 @@ const Section = ( { title, description, children } ) => (
 	</section>
 );
 
-const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
+const Single = ( { tableId, onTableIdResolved } ) => {
 	const [ settings, setSettings ] = useState( defaults );
 	const [ activeTableId, setActiveTableId ] = useState( tableId );
 	const [ postStatus, setPostStatus ] = useState( 'publish' );
-	const [ loading, setLoading ] = useState( Boolean( tableId ) );
+	const [ loading, setLoading ] = useState( true );
 	const [ saving, setSaving ] = useState( false );
 	const [ snackbar, setSnackbar ] = useState( null );
 	const [ copied, setCopied ] = useState( false );
@@ -327,25 +376,40 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 		setSettings( ( current ) => ( { ...current, [ key ]: value } ) );
 
 	useEffect( () => {
+		let active = true;
 		setActiveTableId( tableId );
-		if ( ! tableId ) {
-			setSettings( defaults );
-			setPostStatus( 'publish' );
-			setLoading( false );
-			return;
-		}
 		setLoading( true );
-		wp.apiFetch( { path: `${ API_PATH }/${ tableId }?context=edit` } )
-			.then( ( post ) => {
+		Promise.all( [
+			wp.apiFetch( { path: '/prta/v1/settings' } ),
+			tableId
+				? wp.apiFetch( {
+						path: `${ API_PATH }/${ tableId }?context=edit`,
+				  } )
+				: Promise.resolve( null ),
+		] )
+			.then( ( [ globalSettings, post ] ) => {
+				if ( ! active ) {
+					return;
+				}
+				const tableDefaults = {
+					...defaults,
+					productsPerPage: globalSettings.productsPerPage,
+					descriptionLength: globalSettings.descriptionLength,
+				};
+				if ( ! post ) {
+					setSettings( tableDefaults );
+					setPostStatus( 'publish' );
+					return;
+				}
 				setPostStatus( post.status );
 				let saved = {};
 				try {
 					saved = JSON.parse( post.content?.raw || '{}' );
-				} catch ( parseError ) {
+				} catch ( error ) {
 					saved = {};
 				}
 				setSettings( {
-					...defaults,
+					...tableDefaults,
 					...saved,
 					sortBy:
 						saved.sortBy === 'sorting'
@@ -364,10 +428,19 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 					),
 				} );
 			} )
-			.catch( ( requestError ) =>
-				setSnackbar( { type: 'error', message: requestError.message } )
-			)
-			.finally( () => setLoading( false ) );
+			.catch( ( error ) => {
+				if ( active ) {
+					setSnackbar( { type: 'error', message: error.message } );
+				}
+			} )
+			.finally( () => {
+				if ( active ) {
+					setLoading( false );
+				}
+			} );
+		return () => {
+			active = false;
+		};
 	}, [ tableId ] );
 
 	const saveSettings = async () => {
@@ -376,6 +449,16 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 				type: 'error',
 				message: __(
 					'Please enter a table name.',
+					'table-for-woocommerce'
+				),
+			} );
+			return;
+		}
+		if ( ! settings.columns.length ) {
+			setSnackbar( {
+				type: 'error',
+				message: __(
+					'Select at least one table column.',
 					'table-for-woocommerce'
 				),
 			} );
@@ -842,39 +925,63 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 							value={ settings.sortBy }
 							options={ [
 								{
-									label: 'Default WooCommerce',
+									label: __(
+										'Default WooCommerce',
+										'table-for-woocommerce'
+									),
 									value: 'default',
 								},
 								{
-									label: 'ID',
+									label: __( 'ID', 'table-for-woocommerce' ),
 									value: 'id',
 								},
 								{
-									label: 'Name',
+									label: __(
+										'Name',
+										'table-for-woocommerce'
+									),
 									value: 'name',
 								},
 								{
-									label: 'Published',
+									label: __(
+										'Published',
+										'table-for-woocommerce'
+									),
 									value: 'published',
 								},
 								{
-									label: 'Modified',
+									label: __(
+										'Modified',
+										'table-for-woocommerce'
+									),
 									value: 'modified',
 								},
 								{
-									label: 'Sales',
+									label: __(
+										'Sales',
+										'table-for-woocommerce'
+									),
 									value: 'sales',
 								},
 								{
-									label: 'Rating',
+									label: __(
+										'Rating',
+										'table-for-woocommerce'
+									),
 									value: 'rating',
 								},
 								{
-									label: 'Random',
+									label: __(
+										'Random',
+										'table-for-woocommerce'
+									),
 									value: 'random',
 								},
 								{
-									label: 'Price',
+									label: __(
+										'Price',
+										'table-for-woocommerce'
+									),
 									value: 'price',
 								},
 							] }
@@ -890,15 +997,24 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 							value={ settings.sortDirection }
 							options={ [
 								{
-									label: 'Automatic',
+									label: __(
+										'Automatic',
+										'table-for-woocommerce'
+									),
 									value: 'automatic',
 								},
 								{
-									label: 'Ascending',
+									label: __(
+										'Ascending',
+										'table-for-woocommerce'
+									),
 									value: 'ascending',
 								},
 								{
-									label: 'Descending',
+									label: __(
+										'Descending',
+										'table-for-woocommerce'
+									),
 									value: 'descending',
 								},
 							] }
@@ -929,13 +1045,6 @@ const Single = ( { tableId, onTableIdResolved, onCancel } ) => {
 						min={ 0 }
 					/>
 					<div className="prta-editor-actions">
-						<Button
-							variant="secondary"
-							onClick={ onCancel }
-							disabled={ saving }
-						>
-							{ __( 'Cancel', 'table-for-woocommerce' ) }
-						</Button>{ ' ' }
 						<Button
 							icon="saved"
 							variant="primary"

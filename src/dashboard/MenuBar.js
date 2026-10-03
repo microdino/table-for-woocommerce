@@ -11,11 +11,12 @@ import {
 
 const getRoute = () => {
 	const match = window.location.hash.match( /^#\/table\/(new|\d+)$/ );
-	if ( match )
+	if ( match ) {
 		return {
 			nav: 'single',
 			tableId: match[ 1 ] === 'new' ? null : Number( match[ 1 ] ),
 		};
+	}
 	return {
 		nav: window.location.hash === '#/settings' ? 'settings' : 'dashboard',
 		tableId: null,
@@ -84,7 +85,10 @@ const MenuBar = () => {
 							<img
 								width="55"
 								src={ localize.url + 'assets/img/logo.svg' }
-								alt="Product Tables for WooCommerce Logo"
+								alt={ __(
+									'Product Tables for WooCommerce',
+									'table-for-woocommerce'
+								) }
 							/>
 							<Text
 								style={ {
@@ -153,7 +157,6 @@ const MenuBar = () => {
 					onTableIdResolved={ ( id ) =>
 						setUrl( `#/table/${ id }`, true )
 					}
-					onCancel={ () => navigate( 'dashboard' ) }
 				/>
 			) }
 		</>

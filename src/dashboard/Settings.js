@@ -1,370 +1,326 @@
 const { __ } = wp.i18n;
 import { useEffect, useState } from 'react';
 import {
-	Guide,
-	Card,
-	CardHeader,
-	CardBody,
 	Button,
-	ExternalLink,
-	__experimentalGrid as Grid,
-	__experimentalText as Text,
-	__experimentalHeading as Heading,
-	__experimentalHStack as HStack,
-	__experimentalVStack as VStack,
-	__experimentalNumberControl as NumberControl,
-	BaseControl,
-	__experimentalDivider as Divider,
-	ToggleControl,
-	TextControl,
-	__experimentalSpacer as Spacer,
+	Card,
+	CardBody,
+	CheckboxControl,
+	Notice,
 	SelectControl,
-	__experimentalNavigation as Navigation,
-	__experimentalNavigationGroup as NavigationGroup,
-	__experimentalNavigationItem as NavigationItem,
-	__experimentalNavigationMenu as NavigationMenu,
+	Spinner,
+	TextControl,
+	ToggleControl,
+	__experimentalHeading as Heading,
+	__experimentalNumberControl as NumberControl,
+	__experimentalText as Text,
 } from '@wordpress/components';
+
+const SettingsSection = ( { title, description, children } ) => (
+	<section className="prta-editor-section">
+		<div className="prta-editor-section-heading">
+			<Heading level={ 3 }>{ title }</Heading>
+			<Text variant="muted">{ description }</Text>
+		</div>
+		<div className="prta-editor-fields">{ children }</div>
+	</section>
+);
 
 const Settings = () => {
 	const [ settings, setSettings ] = useState( {} );
-	const [ loading, setLoading ] = useState( false );
+	const [ loading, setLoading ] = useState( true );
+	const [ ready, setReady ] = useState( false );
 	const [ saving, setSaving ] = useState( false );
-
-	const [ isOpen, setIsOpen ] = useState( true );
-	if ( ! isOpen ) {
-		return null;
-	}
-
+	const [ notice, setNotice ] = useState( null );
 	useEffect( () => {
-		// fetchSettings();
+		wp.apiFetch( { path: '/prta/v1/settings' } )
+			.then( ( saved ) => {
+				setSettings( saved );
+				setReady( true );
+			} )
+			.catch( ( error ) =>
+				setNotice( { status: 'error', message: error.message } )
+			)
+			.finally( () => setLoading( false ) );
 	}, [] );
-
-	const menuItems = [
-		{ to: 'dashboard', label: 'Dashboard' },
-		{ to: 'settings', label: 'Settings' },
-	];
-
-	const [ hasCopied, setHasCopied ] = useState( false );
-
+	const set = ( key, value ) =>
+		setSettings( ( current ) => ( { ...current, [ key ]: value } ) );
+	const saveSettings = async () => {
+		setSaving( true );
+		setNotice( null );
+		try {
+			const saved = await wp.apiFetch( {
+				path: '/prta/v1/settings',
+				method: 'POST',
+				data: settings,
+			} );
+			setSettings( saved );
+			setNotice( {
+				status: 'success',
+				message: __( 'Settings saved.', 'table-for-woocommerce' ),
+			} );
+		} catch ( error ) {
+			setNotice( { status: 'error', message: error.message } );
+		} finally {
+			setSaving( false );
+		}
+	};
+	const toggle = ( key, label ) => (
+		<ToggleControl
+			__nextHasNoMarginBottom
+			label={ label }
+			checked={ Boolean( settings[ key ] ) }
+			onChange={ ( value ) => set( key, value ) }
+		/>
+	);
+	const saveButton = (
+		<Button
+			icon="saved"
+			variant="primary"
+			isBusy={ saving }
+			onClick={ saveSettings }
+		>
+			{ __( 'Save Settings', 'table-for-woocommerce' ) }
+		</Button>
+	);
 	return (
-		<div style={ { maxWidth: '1200px', margin: '0 auto' } }>
-			<Card style={ { margin: '20px 20px 20px 0' } }>
-				<CardBody>
-					<Grid templateColumns="1fr 3fr" gap={ 10 }>
-						<VStack alignment="topLeft" spacing={ 2 }>
-							<Heading level={ 3 }>
-								{ __(
-									'Add to Cart Settings',
-									'table-for-woocommerce'
-								) }
-							</Heading>
-							<Text variant="muted">
-								{ __(
-									'Clean up all files uploaded through this field to free storage and remove unused data.',
-									'table-for-woocommerce'
-								) }
-							</Text>
-						</VStack>
-						<VStack spacing={ 5 } style={ { maxWidth: '500px' } }>
-							<TextControl
-								label={ __(
-									'Add to Cart Text',
-									'table-for-woocommerce'
-								) }
-								value={
-									settings.addonsPriceText ?? 'Add to cart'
-								}
-								onChange={ ( v ) =>
-									handleChange( 'addonsPriceText', v )
-								}
-							/>
-							<TextControl
-								label={ __(
-									'Multiple Add to Cart Text (Singular)',
-									'table-for-woocommerce'
-								) }
-								value={
-									settings.addonsPriceText ??
-									'Add 1 item for {total}'
-								}
-								onChange={ ( v ) =>
-									handleChange( 'addonsPriceText', v )
-								}
-							/>
-							<TextControl
-								label={ __(
-									'Multiple Add to Cart Text (Plural)',
-									'table-for-woocommerce'
-								) }
-								value={
-									settings.addonsPriceText ??
-									'Add {items} items for {total}'
-								}
-								onChange={ ( v ) =>
-									handleChange( 'addonsPriceText', v )
-								}
-							/>
-							<SelectControl
-								__next40pxDefaultSize
-								label={ __(
-									'Add to Cart Location',
-									'table-for-woocommerce'
-								) }
-								value={ settings?.condition?.match }
-								options={ [
-									{ value: 'above', label: 'Above Table' },
-									{ value: 'below', label: 'Below Table' },
-									{
-										value: 'all',
-										label: 'Above & Below Table',
-									},
-								] }
-								onChange={ ( v ) =>
-									handleChange( 'condition', 'match', v )
-								}
-							/>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Select all products in the table header',
-									'table-for-woocommerce'
-								) }
-							/>
-						</VStack>
-					</Grid>
-					<Divider
-						margin={ 6 }
-						style={ { borderColor: 'rgba(0, 0, 0, 0.1)' } }
-					/>
-					<Grid templateColumns="1fr 3fr" gap={ 10 }>
-						<VStack alignment="topLeft" spacing={ 2 }>
-							<Heading level={ 3 }>
-								{ __(
-									'Table Content Settings',
-									'table-for-woocommerce'
-								) }
-							</Heading>
-							<Text variant="muted">
-								{ __(
-									'Settings for Managing and Customizing Table Content.',
-									'table-for-woocommerce'
-								) }
-							</Text>
-						</VStack>
-						<VStack spacing={ 5 } style={ { maxWidth: '500px' } }>
-							<NumberControl
-								__next40pxDefaultSize
-								label={ __(
-									'Description Length (Words)',
-									'advanced-product-options'
-								) }
-								value={ settings.uploadTempRemove ?? '' }
-								onChange={ ( v ) =>
-									handleChange( 'uploadTempRemove', v )
-								}
-								suffix={
-									<div
-										style={ {
-											marginRight: '8px',
-										} }
-									>
-										Words
-									</div>
-								}
-								min={ 0 }
-							/>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Show sticky header',
-									'table-for-woocommerce'
-								) }
-							/>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Hide table heading',
-									'table-for-woocommerce'
-								) }
-							/>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Show table footer',
-									'table-for-woocommerce'
-								) }
-							/>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Show hidden products',
-									'table-for-woocommerce'
-								) }
-							/>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Select all	products in the table header',
-									'table-for-woocommerce'
-								) }
-							/>
-						</VStack>
-					</Grid>
-					<Divider
-						margin={ 6 }
-						style={ { borderColor: 'rgba(0, 0, 0, 0.1)' } }
-					/>
-					<Grid templateColumns="1fr 3fr" gap={ 10 }>
-						<VStack alignment="topLeft" spacing={ 2 }>
-							<Heading level={ 3 }>
-								{ __(
-									'Other Settings',
-									'table-for-woocommerce'
-								) }
-							</Heading>
-							<Text variant="muted">
-								{ __(
-									'Settings for Managing and Customizing Other Settings.',
-									'table-for-woocommerce'
-								) }
-							</Text>
-						</VStack>
-						<VStack spacing={ 5 } style={ { maxWidth: '500px' } }>
-							<NumberControl
-								__next40pxDefaultSize
-								label={ __(
-									'Products per page',
-									'table-for-woocommerce'
-								) }
-								value={ settings.productsPerPage ?? 10 }
-								onChange={ ( v ) =>
-									handleChange( 'productsPerPage', v )
-								}
-								suffix={
-									<div
-										style={ {
-											marginRight: '8px',
-										} }
-									>
-										Words
-									</div>
-								}
-								min={ 1 }
-							/>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Search box in table header',
-									'table-for-woocommerce'
-								) }
-							/>
-							<div>
-								<Button
-									isDestructive
-									variant="secondary"
-									onClick={ () => saveSettings() }
-								>
-									{ __(
-										'Delete All Data & Reset Plugin',
+		<Card style={ { margin: '20px 20px 20px 0' } }>
+			<CardBody>
+				{ notice && (
+					<Notice
+						status={ notice.status }
+						onRemove={ () => setNotice( null ) }
+					>
+						{ notice.message }
+					</Notice>
+				) }
+				{ loading && <Spinner /> }
+				<fieldset
+					disabled={ loading || saving || ! ready }
+					style={ { border: 0, margin: 0, padding: 0, minWidth: 0 } }
+				>
+					<SettingsSection
+						title={ __(
+							'Add to Cart Settings',
+							'table-for-woocommerce'
+						) }
+						description={ __(
+							'Customize purchase controls for shortcode and shop page tables.',
+							'table-for-woocommerce'
+						) }
+					>
+						<TextControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Add to Cart Text',
+								'table-for-woocommerce'
+							) }
+							value={ settings.addToCartText ?? '' }
+							onChange={ ( v ) => set( 'addToCartText', v ) }
+						/>
+						<TextControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Multiple Add to Cart Text (Singular)',
+								'table-for-woocommerce'
+							) }
+							help={ __(
+								'Use {items} for quantity and {total} for the selected products’ total.',
+								'table-for-woocommerce'
+							) }
+							value={ settings.multipleAddToCartSingular ?? '' }
+							onChange={ ( v ) =>
+								set( 'multipleAddToCartSingular', v )
+							}
+						/>
+						<TextControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Multiple Add to Cart Text (Plural)',
+								'table-for-woocommerce'
+							) }
+							help={ __(
+								'Use {items} for quantity and {total} for the selected products’ total.',
+								'table-for-woocommerce'
+							) }
+							value={ settings.multipleAddToCartPlural ?? '' }
+							onChange={ ( v ) =>
+								set( 'multipleAddToCartPlural', v )
+							}
+						/>
+						<SelectControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Add to Cart Location',
+								'table-for-woocommerce'
+							) }
+							help={ __(
+								'Position of the button for adding selected products.',
+								'table-for-woocommerce'
+							) }
+							value={ settings.addToCartLocation ?? 'above' }
+							onChange={ ( v ) => set( 'addToCartLocation', v ) }
+							options={ [
+								{
+									value: 'above',
+									label: __(
+										'Above Table',
 										'table-for-woocommerce'
-									) }
-								</Button>
-							</div>
-							<ToggleControl
-								__nextHasNoMarginBottom
-								checked={
-									settings.enableAddonsPriceText ?? true
-								}
-								onChange={ ( v ) =>
-									handleChange( 'enableAddonsPriceText', v )
-								}
-								label={ __(
-									'Enable Caching',
-									'table-for-woocommerce'
-								) }
-							/>
-							<NumberControl
-								__next40pxDefaultSize
-								label={ __(
-									'Cache Duration (Hours)',
-									'table-for-woocommerce'
-								) }
-								value={ settings.cacheDuration ?? 10 }
-								onChange={ ( v ) =>
-									handleChange( 'cacheDuration', v )
-								}
-								suffix={
-									<div
-										style={ {
-											marginRight: '8px',
-										} }
-									>
-										Hours
-									</div>
-								}
-								min={ 1 }
-							/>
-							<div>
-								<Button
-									// <Spinner/>
-									icon={ 'saved' }
-									variant="primary"
-									onClick={ () => saveSettings() }
-								>
-									{ __(
-										'Save Settings',
+									),
+								},
+								{
+									value: 'below',
+									label: __(
+										'Below Table',
 										'table-for-woocommerce'
-									) }
-								</Button>
-							</div>
-						</VStack>
-					</Grid>
-				</CardBody>
-			</Card>
-		</div>
+									),
+								},
+								{
+									value: 'all',
+									label: __(
+										'Above & Below Table',
+										'table-for-woocommerce'
+									),
+								},
+							] }
+						/>
+						{ toggle(
+							'selectAllProducts',
+							__(
+								'Select all products in the table header',
+								'table-for-woocommerce'
+							)
+						) }
+					</SettingsSection>
+					<SettingsSection
+						title={ __(
+							'Table Content Settings',
+							'table-for-woocommerce'
+						) }
+						description={ __(
+							'Control table headings, product visibility, and content defaults.',
+							'table-for-woocommerce'
+						) }
+					>
+						<NumberControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Description Length (Words)',
+								'table-for-woocommerce'
+							) }
+							help={ __(
+								'Default for new tables and tables without a saved description length. Individual table settings take precedence.',
+								'table-for-woocommerce'
+							) }
+							value={ settings.descriptionLength ?? 15 }
+							min={ 0 }
+							onChange={ ( v ) => set( 'descriptionLength', v ) }
+						/>
+						{ toggle(
+							'stickyHeader',
+							__( 'Show sticky header', 'table-for-woocommerce' )
+						) }
+						{ toggle(
+							'hideTableHeading',
+							__( 'Hide table heading', 'table-for-woocommerce' )
+						) }
+						{ toggle(
+							'showTableFooter',
+							__( 'Show table footer', 'table-for-woocommerce' )
+						) }
+						{ toggle(
+							'showHiddenProducts',
+							__(
+								'Show hidden products',
+								'table-for-woocommerce'
+							)
+						) }
+						{ toggle(
+							'selectAllProducts',
+							__(
+								'Select all products in the table header',
+								'table-for-woocommerce'
+							)
+						) }
+					</SettingsSection>
+					<SettingsSection
+						title={ __(
+							'Other Settings',
+							'table-for-woocommerce'
+						) }
+						description={ __(
+							'Set pagination defaults, search, caching, and uninstall behavior.',
+							'table-for-woocommerce'
+						) }
+					>
+						<NumberControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Products per page',
+								'table-for-woocommerce'
+							) }
+							help={ __(
+								'Default for new tables and tables without a saved page size. Individual table settings take precedence.',
+								'table-for-woocommerce'
+							) }
+							value={ settings.productsPerPage ?? 20 }
+							min={ 1 }
+							onChange={ ( v ) => set( 'productsPerPage', v ) }
+						/>
+						{ toggle(
+							'showSearchBox',
+							__(
+								'Search box in table header',
+								'table-for-woocommerce'
+							)
+						) }
+						<CheckboxControl
+							__nextHasNoMarginBottom
+							label={ __(
+								'Permanently delete all WooCommerce Product Table settings and data when deleting the plugin',
+								'table-for-woocommerce'
+							) }
+							help={ __(
+								'Unchecked by default. Applies only when the plugin is deleted, not when it is deactivated.',
+								'table-for-woocommerce'
+							) }
+							checked={ Boolean(
+								settings.deleteDataOnUninstall
+							) }
+							onChange={ ( v ) =>
+								set( 'deleteDataOnUninstall', v )
+							}
+						/>
+						{ toggle(
+							'enableCaching',
+							__( 'Enable Caching', 'table-for-woocommerce' )
+						) }
+						<NumberControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __(
+								'Cache Duration (Hours)',
+								'table-for-woocommerce'
+							) }
+							value={ settings.cacheDuration ?? 10 }
+							min={ 1 }
+							disabled={ ! settings.enableCaching }
+							onChange={ ( v ) => set( 'cacheDuration', v ) }
+						/>
+					</SettingsSection>
+					<div className="prta-settings-actions">
+						<div className="prta-editor-actions">
+							{ saveButton }
+						</div>
+					</div>
+				</fieldset>
+			</CardBody>
+		</Card>
 	);
 };
-
 export default Settings;

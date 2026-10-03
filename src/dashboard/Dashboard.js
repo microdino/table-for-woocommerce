@@ -24,6 +24,17 @@ import {
 } from '@wordpress/components';
 
 const API_PATH = '/wp/v2/adpro_option';
+const SHOP_PAGE_OPTIONS = [
+	[ 'shopPage', __( 'Shop Page', 'table-for-woocommerce' ) ],
+	[ 'searchPage', __( 'Product Search Page', 'table-for-woocommerce' ) ],
+	[ 'categoryPage', __( 'Product Category Page', 'table-for-woocommerce' ) ],
+	[ 'tagPage', __( 'Product Tag Page', 'table-for-woocommerce' ) ],
+	[
+		'attributesPage',
+		__( 'Product Attributes Page', 'table-for-woocommerce' ),
+	],
+	[ 'brandPage', __( 'Product Brand Page', 'table-for-woocommerce' ) ],
+];
 const getSettings = ( post ) => {
 	try {
 		return JSON.parse(
@@ -112,7 +123,9 @@ const Dashboard = ( { onEdit } ) => {
 				},
 			} );
 			setPage( 1 );
-			if ( page === 1 ) loadTables();
+			if ( page === 1 ) {
+				loadTables();
+			}
 		} catch ( requestError ) {
 			setError( requestError.message );
 		} finally {
@@ -120,7 +133,9 @@ const Dashboard = ( { onEdit } ) => {
 		}
 	};
 	const deleteTables = async () => {
-		if ( ! pendingDelete.length ) return;
+		if ( ! pendingDelete.length ) {
+			return;
+		}
 		setDeleting( true );
 		try {
 			await Promise.all(
@@ -141,12 +156,15 @@ const Dashboard = ( { onEdit } ) => {
 		}
 	};
 	const applyBulk = async () => {
-		if ( bulkAction === 'delete' ) return setPendingDelete( selected );
+		if ( bulkAction === 'delete' ) {
+			return setPendingDelete( selected );
+		}
 		if (
 			! selected.length ||
 			! [ 'enable', 'disable' ].includes( bulkAction )
-		)
+		) {
 			return;
+		}
 		try {
 			await Promise.all(
 				selected.map( ( id ) =>
@@ -169,7 +187,7 @@ const Dashboard = ( { onEdit } ) => {
 
 	return (
 		<>
-			<Card style={ { marginTop: '20px' } }>
+			<Card style={ { margin: '20px 20px 0 0' } }>
 				<CardHeader>
 					<VStack style={ { width: '100%' } } spacing={ 3 }>
 						<HStack alignment="edge">
@@ -266,11 +284,24 @@ const Dashboard = ( { onEdit } ) => {
 						<Spinner />
 					) : (
 						<>
-							<div className="prta-dashboard-table-scroll">
+							<div
+								className="prta-dashboard-table-scroll"
+								role="region"
+								tabIndex={ 0 }
+								aria-label={ __(
+									'Product tables',
+									'table-for-woocommerce'
+								) }
+							>
 								<div className="prta-dashboard-table">
 									<div className="prta-dashboard-row prta-dashboard-head">
 										<CheckboxControl
 											__nextHasNoMarginBottom
+											label={ __(
+												'Select all tables on this page',
+												'table-for-woocommerce'
+											) }
+											className="prta-selection-checkbox"
 											checked={
 												tables.length > 0 &&
 												selected.length ===
@@ -348,6 +379,17 @@ const Dashboard = ( { onEdit } ) => {
 											>
 												<CheckboxControl
 													__nextHasNoMarginBottom
+													label={ sprintf(
+														/* translators: %s: table name. */
+														__(
+															'Select %s',
+															'table-for-woocommerce'
+														),
+														table.title?.raw ||
+															settings.tableName ||
+															String( table.id )
+													) }
+													className="prta-selection-checkbox"
 													checked={ selected.includes(
 														table.id
 													) }
@@ -402,62 +444,98 @@ const Dashboard = ( { onEdit } ) => {
 														}
 													/>
 												</span>
-												<Text>
+												<div className="prta-dashboard-display">
 													{ settings.displayIn ===
 													'shop'
-														? __(
-																'Shop pages',
-																'table-for-woocommerce'
+														? SHOP_PAGE_OPTIONS.some(
+																( [ key ] ) =>
+																	settings[
+																		key
+																	]
 														  )
+															? SHOP_PAGE_OPTIONS.filter(
+																	( [
+																		key,
+																	] ) =>
+																		settings[
+																			key
+																		]
+															  ).map(
+																	( [
+																		key,
+																		label,
+																	] ) => (
+																		<span
+																			key={
+																				key
+																			}
+																		>
+																			{
+																				label
+																			}
+																		</span>
+																	)
+															  )
+															: __(
+																	'No pages selected',
+																	'table-for-woocommerce'
+															  )
 														: __(
 																'Shortcode',
 																'table-for-woocommerce'
 														  ) }
-												</Text>
+												</div>
 												<span className="prta-dashboard-shortcode">
-													<div className="prta-dashboard-copy">
-														<TextControl
-															className="adpro-w-full"
-															__nextHasNoMarginBottom
-															__next40pxDefaultSize
-															value={ shortcode }
-															readOnly
-															label="shortcode"
-															hideLabelFromVision
-														/>
-														<ClipboardButton
-															text={ shortcode }
-															variant="secondary"
-															icon={
-																hasCopied ===
-																table.id
-																	? 'yes'
-																	: 'admin-page'
-															}
-															label={
-																hasCopied ===
-																table.id
-																	? __(
-																			'Copied',
-																			'table-for-woocommerce'
-																	  )
-																	: __(
-																			'Copy shortcode',
-																			'table-for-woocommerce'
-																	  )
-															}
-															onCopy={ () =>
-																setHasCopied(
+													{ settings.displayIn !==
+														'shop' && (
+														<div className="prta-dashboard-copy">
+															<TextControl
+																className="adpro-w-full"
+																__nextHasNoMarginBottom
+																__next40pxDefaultSize
+																value={
+																	shortcode
+																}
+																readOnly
+																label="shortcode"
+																hideLabelFromVision
+															/>
+															<ClipboardButton
+																text={
+																	shortcode
+																}
+																variant="secondary"
+																icon={
+																	hasCopied ===
 																	table.id
-																)
-															}
-															onFinishCopy={ () =>
-																setHasCopied(
-																	null
-																)
-															}
-														/>
-													</div>
+																		? 'yes'
+																		: 'admin-page'
+																}
+																label={
+																	hasCopied ===
+																	table.id
+																		? __(
+																				'Copied',
+																				'table-for-woocommerce'
+																		  )
+																		: __(
+																				'Copy shortcode',
+																				'table-for-woocommerce'
+																		  )
+																}
+																onCopy={ () =>
+																	setHasCopied(
+																		table.id
+																	)
+																}
+																onFinishCopy={ () =>
+																	setHasCopied(
+																		null
+																	)
+																}
+															/>
+														</div>
+													) }
 												</span>
 												<div className="prta-dashboard-action">
 													<DropdownMenu
